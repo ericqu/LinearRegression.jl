@@ -43,13 +43,13 @@ First, the GLM package provides more than linear regression with Ordinary Least-
 
 LinearRegression package only supports models with an intercept, GLM supports models with and without intercept.
 
-LinearRegression does not support analytical weights (however it is under consideration), GLM supports frequency weights. 
+LinearRegression does not support analytical weights (however, it is under consideration); GLM supports frequency weights.
 
 Both LinearRegression and GLM rely on StatsModels.jl for the model's description (@formula); hence it is easy to move between the two packages. Similarly, categorical variables are defined in the same way facilitating moving from one to the other when needed.
 
 LinearRegression relies on the Sweep operator to estimate the coefficients, and GLM depends on Cholesky and QR factorizations.
 
-The Akaike information criterion (AIC) is calculated with the formula relevant only for Linear Regression hence enabling comparison between linear regressions (AIC=n log(SSE / n) + 2p; where SSE is the Sum of Squared Errors and p the number of predictors). The AIC calculated with GLM is more general (based on log likelihood) enabling comparison between a wider range of models.
+The Akaike information criterion (AIC) is calculated with the formula relevant only for Linear Regression hence enabling comparison between linear regressions (AIC=n log(SSE / n) + 2p; where SSE is the Sum of Squared Errors and p is the number of predictors). On the other hand, the AIC calculated with GLM is more general (based on log-likelihood), enabling comparison between a broader range of models.
 
 # Questions and Feedback
 Please post your questions, feedabck or issues in the Issues tabs. As much as possible, please provide relevant contextual information.
