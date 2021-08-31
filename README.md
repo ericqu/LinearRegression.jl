@@ -51,6 +51,39 @@ LinearRegression relies on the Sweep operator to estimate the coefficients, and 
 
 The Akaike information criterion (AIC) is calculated with the formula relevant only for Linear Regression hence enabling comparison between linear regressions (AIC=n log(SSE / n) + 2p; where SSE is the Sum of Squared Errors and p is the number of predictors). On the other hand, the AIC calculated with GLM is more general (based on log-likelihood), enabling comparison between a broader range of models.
 
+# List of Statistics 
+## List of Statistics calculated about the linear regression model:
+- AIC: Akaike information criterion with the formula AIC=n log(SSE / n) + 2p; where SSE is the Sum of Squared Errors and p is the number of predictors.
+- P values for each predictor.
+- SSE Sum of Squared Errors as the output from the sweep operator.
+- SST as the Total Sum of Squares as the sum over all squared differences between the observations and their overall mean.
+- R² as 1 - SSE/SST.
+- Adjusted R².
+- σ̂² (sigma) Estimate of the error variance.
+- Variance Inflation Factor.
+- CI the confidence interval based the \alpha default value of 0.05 giving the 95% confidence interval.
+- The t-statistic.
+- The mean squared error.
+- The root of the mean squared error.
+- The standard errors.
+- The t values.
+
+## List of Statistics about the predicted values:
+- The predicted values
+- The residuals values (as the actual values minus the predicted ones)
+- The Leverage or the i-th diagonal element of the projection matrix.
+- STDI is the standard error of the individual predicted value.
+- STDP is the standard error of the mean predicted value
+- STDR is the standard error of the residual
+- Student as the studentized residuals also knows as the Standardized residuals or internally studentized residuals.
+- Rstudent is the studentized residual with the current observation deleted.
+- LCLI is the lower bound of the confidence interval for the individual prediction.
+- UCLI is the upper bound of the confidence interval for the individual prediction.
+- LCLP is the lower bound of the confidence interval for the expected (mean) value.
+- UCLP is the upper bound of the confidence interval for the expected (mean) value.
+- Cook's Distance
+- PRESS as the sum of squares of predicted residual errors
+
 # Questions and Feedback
 Please post your questions, feedabck or issues in the Issues tabs. As much as possible, please provide relevant contextual information.
 
