@@ -30,6 +30,7 @@ Model statistics:
   R²: 0.938467                  Adjusted R²: 0.935049
   MSE: 1.01417                  RMSE: 1.00706
   σ̂²: 1.01417                   AIC: 2.17421
+Confidence interval: 95%
 Coefficients statistics:
 Terms ╲ Stats │       Coefs      Std err            t     Pr(>|t|)       low ci      high ci          VIF
 ──────────────┼──────────────────────────────────────────────────────────────────────────────────────────
