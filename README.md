@@ -14,7 +14,6 @@ The following is a simple usage:
 ```julia 
 using LinearRegression, DataFrames, StatsModels
 
-# x specific gravity
 x = [0.68, 0.631, 0.348, 0.413, 0.698, 0.368, 0.571, 0.433, 0.252, 0.387, 0.409, 0.456, 0.375, 0.495, 0.55, 0.576, 0.265, 0.299, 0.612, 0.631]
 y = [15.72, 14.86, 6.14, 8.21, 17.07, 9.07, 14.68, 10.37, 5.18, 9.36, 7.61, 10.43, 8.93, 10.33, 14.46, 12.39, 4.06, 4.67, 13.73, 14.75]
 
@@ -44,11 +43,20 @@ First, the GLM package does not focus on linear regression with OLS (Ordinary Le
 
 LinearRegression only support model with an intercept, GLM support model and with and without intercept.
 
-LinearRegression does not support analytical weights (but plans to do so), GLM supports frequency weights. 
+LinearRegression does not support analytical weights (however it is under consideration), GLM supports frequency weights. 
 
 Both LinearRegression and GLM rely on StatsModels.jl for the model's description (formula) hence it is easy to move between the two packages. And categorical variables will be defined in the same way.
 
 LinearRegression relies on the Sweep operator to estimate the coefficients and GLM relies on Cholesky and QR factorizations.
 
+The Akaike information criterion (AIC) is calculated with the formula relevant only for Linear Regression hence enabling comparison between linear regressions (AIC=n log(SSE / n) + 2p; where SSE is the Sum of Squared Errors and p the number of predictors). The AIC calculated with GLM is more general (based on log likelihood) enabling comparison between a wider range of models.
+
 # Questions and Feedback
 Please post your questions, feedabck or issues in the Issues tabs. As much as possible, please provide relevant contextual information.
+
+# Credits and additional information
+- Goodnight, J. (1979). "A Tutorial on the SWEEP Operator." The American Statistician.
+- Gordon, R. A. (2015). Regression Analysis for the Social Sciences. New York and London: Routledge.
+- https://blogs.sas.com/content/iml/2021/07/14/performance-ls-regression.html
+- https://github.com/joshday/SweepOperator.jl
+- http://hua-zhou.github.io/teaching/biostatm280-2019spring/slides/12-sweep/sweep.html

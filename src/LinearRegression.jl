@@ -14,26 +14,27 @@ include("utilities.jl")
 
 struct linRegRes 
     extended_inverse::Matrix                # Store the extended inverse matrix 
-    coefs::Union{Nothing,Vector}           # Store the coefficients of the fitted model
-    stderrors::Union{Nothing,Vector}       # Store the standard errors for the fitted model
-    t_values::Union{Nothing,Vector}        # Store the t values for the fitted model
+    coefs::Union{Nothing,Vector}            # Store the coefficients of the fitted model
+    stderrors::Union{Nothing,Vector}        # Store the standard errors for the fitted model
+    t_values::Union{Nothing,Vector}         # Store the t values for the fitted model
     p::Int64                                # Store the number of parameters (including the intercept as a parameter)
-    MSE::Union{Nothing,Float64}            # Store the Mean squared error for the fitted model
+    MSE::Union{Nothing,Float64}             # Store the Mean squared error for the fitted model
     intercept::Bool                         # Indicate if the model has an intercept
-    R2::Union{Nothing,Float64}             # Store the R-squared value for the fitted model
-    ADJR2::Union{Nothing,Float64}          # Store the adjusted R-squared value for the fitted model
-    RMSE::Union{Nothing,Float64}           # Store the Root mean square error for the fitted model
-    AIC::Union{Nothing,Float64}            # Store the Akaike information criterion for the fitted model
-    σ̂²::Union{Nothing,Float64}             # Store the σ̂² for the fitted model
-    p_values::Union{Nothing,Vector}        # Store the p values for the fitted model
-    ci_up::Union{Nothing,Vector}           # Store the upper values confidence interval of the coefficients 
-    ci_low::Union{Nothing,Vector}          # Store the lower values confidence interval of the coefficients 
+    R2::Union{Nothing,Float64}              # Store the R-squared value for the fitted model
+    ADJR2::Union{Nothing,Float64}           # Store the adjusted R-squared value for the fitted model
+    RMSE::Union{Nothing,Float64}            # Store the Root mean square error for the fitted model
+    AIC::Union{Nothing,Float64}             # Store the Akaike information criterion for the fitted model
+    σ̂²::Union{Nothing,Float64}              # Store the σ̂² for the fitted model
+    p_values::Union{Nothing,Vector}         # Store the p values for the fitted model
+    ci_up::Union{Nothing,Vector}            # Store the upper values confidence interval of the coefficients 
+    ci_low::Union{Nothing,Vector}           # Store the lower values confidence interval of the coefficients 
     observations                            # Store the number of observations used in the model
-    t_statistic::Union{Nothing,Float64}    # Store the t statistic
-    VIF::Union{Nothing,Vector}             # Store the Varince inflation factor
+    t_statistic::Union{Nothing,Float64}     # Store the t statistic
+    VIF::Union{Nothing,Vector}              # Store the Varince inflation factor
     modelformula                            # Store the model formula
     dataschema                              # Store the dataschema
     updformula                              # Store the updated model formula (after the dataschema has been applied)
+    alpha                                   # Store the alpha used to compute the confidence interval of the coefficients
 end
 
 """
@@ -64,6 +65,10 @@ function Base.show(io::IO, lr::linRegRes)
         @printf(io, "  σ̂²: %g\n", lr.σ̂²)
     elseif !isnothing(lr.AIC)
         @printf(io, "  AIC: %g\n", lr.AIC)
+    end
+    
+    if !isnothing(lr.ci_low) || !isnothing(lr.ci_up)
+        @printf(io, "Confidence interval: %g%%\n", (1 - lr.alpha)*100 )
     end
 
     all_stats = [lr.coefs, lr.stderrors, lr.t_values, lr.p_values, lr.ci_low, lr.ci_up, lr.VIF]
@@ -151,11 +156,9 @@ function hasintercept(f::StatsModels.FormulaTerm)
 end
 
 """
-    function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame, α=0.05)
+    function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame; α::Float64=0.05, req_stats=["all"], remove_missing=false)
 
-    Estimate the coefficients of the regression, given a dataset an formula. 
-    Use the same dataset to make predictions, give results in a new DataFrame.
-    
+    Estimate the coefficients of the regression, given a dataset and a formula. 
 """
 function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame; α::Float64=0.05, req_stats=["all"], remove_missing=false)
     intercept = hasintercept(f)
@@ -164,7 +167,7 @@ function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame; α::Float
 
     copieddf = df 
     if remove_missing
-        copieddf = df[! , Symbol.(keys(schema(f, df).schema))]
+        copieddf = copy(df[! , Symbol.(keys(schema(f, df).schema))])
         dropmissing!(copieddf)
     end
 
@@ -233,7 +236,7 @@ function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame; α::Float
                 get(vector_stats, :p_values, nothing), 
                 haskey(vector_stats, :ci) ? coefs .+ vector_stats[:ci] : nothing, 
                 haskey(vector_stats, :ci) ? coefs .- vector_stats[:ci] : nothing, 
-                n, get(scalar_stats, :t_statistic, nothing), get(vector_stats, :vif, nothing), f, dataschema, updatedformula)
+                n, get(scalar_stats, :t_statistic, nothing), get(vector_stats, :vif, nothing), f, dataschema, updatedformula, α)
 
     return sres
 end
@@ -267,12 +270,21 @@ function predict_and_stats(lr::linRegRes, df::DataFrames.DataFrame; α=0.05, req
         needed_stats[:residuals] = y .- needed_stats[:predicted]
     end
     if :stdp in needed
+        if isnothing(lr.σ̂²)
+            throw(ArgumentError(":stdp requires that the σ̂² (:sigma) was previously calculated through the regression"))
+        end
         needed_stats[:stdp] = sqrt.(needed_stats[:leverage] .* lr.σ̂²)
     end
     if :stdi in needed
+        if isnothing(lr.σ̂²)
+            throw(ArgumentError(":stdi requires that the σ̂² (:sigma) was previously calculated through the regression"))
+        end
         needed_stats[:stdi] = sqrt.((1. .+ needed_stats[:leverage]) .* lr.σ̂²)
     end
     if :stdr in needed
+        if isnothing(lr.σ̂²)
+            throw(ArgumentError(":stdi requires that the σ̂² (:sigma) was previously calculated through the regression"))
+        end
         needed_stats[:stdr] = sqrt.((1. .- needed_stats[:leverage]) .* lr.σ̂²)
     end
     if :student in needed
