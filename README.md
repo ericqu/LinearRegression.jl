@@ -40,9 +40,13 @@ x             │     27.6201      1.66699      16.5688  2.41337e-12      24.117
 
 # Contrasts with Julia Stats GLM package
 First, the GLM package provides more than linear regression with Ordinary Least-Squares through the Generalized Linear Model with Maximum Likelihood Estimation.
+
 LinearRegression package only supports models with an intercept, GLM supports models with and without intercept.
+
 LinearRegression does not support analytical weights (however they are planned); GLM supports frequency weights.
+
 Both LinearRegression and GLM rely on StatsModels.jl for the model's description (@formula); hence it is easy to move between the two packages. Similarly, categorical variables are defined in the same way facilitating moving from one to the other when needed.
+
 LinearRegression relies on the Sweep operator to estimate the coefficients, and GLM depends on Cholesky and QR factorizations.
 
 # Questions and Feedback
