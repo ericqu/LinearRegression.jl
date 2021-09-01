@@ -1,5 +1,5 @@
 using StatsBase: isapprox
-include("../src/LinearRegression.jl")
+# include("../src/LinearRegression.jl")
 
 @testset "Less than full rank regression behaviour" begin
     # The package does not remove collinear terms (when there is a less than full rank matrix).

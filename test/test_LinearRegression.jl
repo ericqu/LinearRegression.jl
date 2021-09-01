@@ -1,4 +1,4 @@
-include("../src/LinearRegression.jl")
+# include("../src/LinearRegression.jl")
 
 @testset "from glm" begin 
 

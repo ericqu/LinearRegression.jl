@@ -1,3 +1,4 @@
+using LinearRegression
 using Test, DataFrames, CSV
 using StatsModels
 
