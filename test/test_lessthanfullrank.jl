@@ -5,8 +5,8 @@ using StatsBase: isapprox
     # The package does not remove collinear terms (when there is a less than full rank matrix).
     # This test only checks that the behaviour is similar to other software package (such as R).
     
-    data = CSV.read("test/Car-Training.csv", DataFrame)
-    data
+    data = CSV.read("../test/Car-Training.csv", DataFrame)
+
     clm = regress(@formula( Price ~ 1 + Year + Mileage ), data)
 
     @test isapprox([-2.1875899220039356e6, 1096.1497198779816, -0.023836779513595294] , clm.coefs)
