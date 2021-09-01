@@ -182,6 +182,7 @@ function get_prediction_stats(req_stats::Vector{Symbol})
 
 end
 
+using NamedArrays
 """
     function my_namedarray_print(io::IO, n::NamedArray)
 
