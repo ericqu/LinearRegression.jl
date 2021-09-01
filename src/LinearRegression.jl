@@ -166,7 +166,7 @@ function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame; α::Float
 
     copieddf = df 
     if remove_missing
-        copieddf = copy(df[! , Symbol.(keys(schema(f, df).schema))])
+        copieddf = copy(df[: , Symbol.(keys(schema(f, df).schema))])
         dropmissing!(copieddf)
     end
 
@@ -182,10 +182,11 @@ function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame; α::Float
     xytxy = xy' * xy
 
     # mandatory stats
-    sse = sweep_op_full!(xytxy)[end] # probably does not work without an intercept
+    sse = sweep_op_full!(xytxy)[end]
     coefs = xytxy[1:p, end]
     mse = xytxy[p + 1, p + 1] / (n - p)
 
+    # optional stats
     total_scalar_stats = Set([:sse, :mse, :sst, :r2, :adjr2, :rmse, :aic, :sigma, :t_statistic, :vif])
     total_vector_stats = Set([:coefs, :stderror, :t_values, :p_values, :ci])
 
