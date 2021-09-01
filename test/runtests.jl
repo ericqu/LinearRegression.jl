@@ -1,4 +1,5 @@
 using Test, DataFrames, CSV
+using StatsModels
 
 include("test_sweep_operator.jl")
 include("test_utilities.jl")
