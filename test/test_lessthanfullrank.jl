@@ -1,7 +1,4 @@
 using StatsBase: isapprox
-using DataFrames
-using CSV
-
 include("../src/LinearRegression.jl")
 
 @testset "Less than full rank regression behaviour" begin
