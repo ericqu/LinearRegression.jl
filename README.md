@@ -143,7 +143,7 @@ select(results, [:predicted, :y]) |> @vlplot(
     title = "Predicted vs actual", width = 400, height = 400
 )
 ```
-![alt text](https://github.com/ericqu/LinearRegression.jl/raw/main/assets/asset_exe_001.svg "Predicted vs actual model 1")
+![Predicted vs actual model 1](https://github.com/ericqu/LinearRegression.jl/raw/main/assets/asset_exe_001.svg "Predicted vs actual model 1")
 
 
 ```julia
@@ -152,10 +152,12 @@ select(results, [:predicted, :residuals]) |>
         @vlplot(:point, :predicted, :residuals) +
         @vlplot(mark = {:rule, color = :darkgrey}, y = {datum = 0})
 ```
-![alt text](https://github.com/ericqu/LinearRegression.jl/raw/main/assets/asset_exe_002.svg "Predicted vs residuals model 1")
+
+![Predicted vs residuals model 1](https://github.com/ericqu/LinearRegression.jl/raw/main/assets/asset_exe_002.svg "Predicted vs residuals model 1")
 
 Both plots indicating the potential presence a polynomial component.
 Hence one might try to add one by doing the following:
+
 ```julia 
 lr = regress(@formula(y ~ 1 + x + x^2 ), vdf)
 ```
@@ -175,11 +177,13 @@ Terms ╲ Stats │       Coefs      Std err            t     Pr(>|t|)       low
 x             │    -9.20267      1.73096     -5.31652   6.65925e-7     -12.6377     -5.76764      6.29568
 x ^ 2         │     8.99074     0.264591      33.9798  5.00484e-56      8.46566      9.51581      6.29568
 ```
-Which aside from the slightly high VIF does not indicate anything wrong. Lets look at the updated "predicted vs residuals" plots (same code used):
+Which aside from the slightly high VIF does not indicate anything wrong. 
+Lets look at the updated "predicted vs residuals" plots (same code used):
 
-![alt text](https://github.com/ericqu/LinearRegression.jl/raw/main/assets/asset_exe_003.svg "Predicted vs residuals model 2")
+![Predicted vs residuals model 2](https://github.com/ericqu/LinearRegression.jl/raw/main/assets/asset_exe_003.svg "Predicted vs residuals model 2")
 
-Which still show a potential polynomial. To shorten the analysis we can add the cubic component in the model:
+Which still show a strong pattern. 
+To shorten the analysis we can add the cubic component in the model:
 
 ```julia 
 lr = regress(@formula(y ~ 1 + x + x^3 ), vdf)
@@ -201,7 +205,9 @@ x             │      2.44422      0.200118       12.2139   2.11167e-21       2
 x ^ 3         │     0.999989    0.00409832       243.999  2.99597e-138      0.991856       1.00812       4.00602
 ```
 And the following Predicted vs Residuals plots:
+
 ![alt text](https://github.com/ericqu/LinearRegression.jl/raw/main/assets/asset_exe_004.svg "Predicted vs residuals model 3")
+
 Which this time show a much more linear relationship.
 
 To look to outliers of interest additional plots can be used such as: Leverage vs Rstudent (or studentized residual with the current observation deleted), as well as the Cook's Distance.
