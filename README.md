@@ -153,3 +153,84 @@ select(results, [:predicted, :residuals]) |>
         @vlplot(mark = {:rule, color = :darkgrey}, y = {datum = 0})
 ```
 ![alt text](https://github.com/ericqu/LinearRegression.jl/raw/main/assets/asset_exe_002.svg "Predicted vs residuals model 1")
+
+Both plots indicating the potential presence a polynomial component.
+Hence one might try to add one by doing the following:
+```julia 
+lr = regress(@formula(y ~ 1 + x + x^2 ), vdf)
+```
+Giving:
+```
+Model definition:  y ~ 1 + x + :(x ^ 2)
+Used observations:      101
+Model statistics:
+  R²: 0.982048                  Adjusted R²: 0.981681
+  MSE: 408.574                  RMSE: 20.2132
+  σ̂²: 408.574                   AIC: 610.235
+Confidence interval: 95%
+Coefficients statistics:
+Terms ╲ Stats │       Coefs      Std err            t     Pr(>|t|)       low ci      high ci          VIF
+──────────────┼──────────────────────────────────────────────────────────────────────────────────────────
+(Intercept)   │     -20.377      2.88895     -7.05342  2.49191e-10       -26.11      -14.644          0.0
+x             │    -9.20267      1.73096     -5.31652   6.65925e-7     -12.6377     -5.76764      6.29568
+x ^ 2         │     8.99074     0.264591      33.9798  5.00484e-56      8.46566      9.51581      6.29568
+```
+Which aside from the slightly high VIF does not indicate anything wrong. Lets look at the updated "predicted vs residuals" plots (same code used):
+
+![alt text](https://github.com/ericqu/LinearRegression.jl/raw/main/assets/asset_exe_003.svg "Predicted vs residuals model 2")
+
+Which still show a potential polynomial. To shorten the analysis we can add the cubic component in the model:
+
+```julia 
+lr = regress(@formula(y ~ 1 + x + x^3 ), vdf)
+```
+Giving:
+```
+Model definition:  y ~ 1 + x + :(x ^ 3)
+Used observations:      101
+Model statistics:
+  R²: 0.999623                  Adjusted R²: 0.999615
+  MSE: 8.58223                  RMSE: 2.92954
+  σ̂²: 8.58223                   AIC: 220.074
+Confidence interval: 95%
+Coefficients statistics:
+Terms ╲ Stats │        Coefs       Std err             t      Pr(>|t|)        low ci       high ci           VIF
+──────────────┼─────────────────────────────────────────────────────────────────────────────────────────────────
+(Intercept)   │     -1.47862       0.42911      -3.44578   0.000839903      -2.33018     -0.627064           0.0
+x             │      2.44422      0.200118       12.2139   2.11167e-21       2.04709       2.84134       4.00602
+x ^ 3         │     0.999989    0.00409832       243.999  2.99597e-138      0.991856       1.00812       4.00602
+```
+And the following Predicted vs Residuals plots:
+![alt text](https://github.com/ericqu/LinearRegression.jl/raw/main/assets/asset_exe_004.svg "Predicted vs residuals model 3")
+Which this time show a much more linear relationship.
+
+To look to outliers of interest additional plots can be used such as: Leverage vs Rstudent (or studentized residual with the current observation deleted), as well as the Cook's Distance.
+
+```julia
+threshold_leverage = 2 * lr.p / lr.observations
+select(results, [:leverage, :rstudent]) |> 
+    @vlplot(title = "Leverage vs Rstudent", width = 400, height = 400,
+        x = {axis = {grid= false}}, y = {axis = {grid= false}}   ) +
+    @vlplot(:point, :leverage, :rstudent) +
+    @vlplot(mark = {:rule, color = :darkgrey}, y = {datum = -2}) +
+    @vlplot(mark = {:rule, color = :darkgrey}, x = {datum = threshold_leverage}) +
+    @vlplot(mark = {:rule, color = :darkgrey}, y = {datum = 2}) 
+
+threshold_cooksd = 4 / lr.observations
+select(results, [:x, :cooksd]) |> 
+    @vlplot(title = "x vs Cook's Distance", width = 400, height = 200) +
+    @vlplot(
+        mark={:rule, color = :steelblue},
+        enc =
+        {
+            x = {:x, type = :quantitative, axis = {grid = false}},
+            y = {datum = 0} ,
+            y2 = :cooksd
+        }
+        ) +
+    @vlplot(mark = {:rule, color = :darkgrey}, y = {datum = threshold_cooksd})  
+```
+![alt text](https://github.com/ericqu/LinearRegression.jl/raw/main/assets/asset_exe_004.svg "Leverage vs Rstudent")
+
+![alt text](https://github.com/ericqu/LinearRegression.jl/raw/main/assets/asset_exe_004.svg "x vs Cook's distance")
+
