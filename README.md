@@ -210,6 +210,9 @@ And the following Predicted vs Residuals plots:
 
 Which this time show residuals scatters without an obvious pattern, potentially showing the Normal error component of the model.
 
+Without surprise, the "Predicted vs actual" plot now shows a linear relationship. 
+![Predicted vs actual](https://github.com/ericqu/LinearRegression.jl/raw/main/assets/asset_exe_005.svg "Predicted vs actual, model 3")
+
 To look to outliers of interest additional plots can be used such as: Leverage vs Rstudent (or studentized residual with the current observation deleted), as well as the Cook's Distance.
 
 ```julia
@@ -236,7 +239,8 @@ select(results, [:x, :cooksd]) |>
         ) +
     @vlplot(mark = {:rule, color = :darkgrey}, y = {datum = threshold_cooksd})  
 ```
-![Leverage vs Rstudent](https://github.com/ericqu/LinearRegression.jl/raw/main/assets/asset_exe_005.svg "Leverage vs Rstudent")
 
-![x vs Cook's distance](https://github.com/ericqu/LinearRegression.jl/raw/main/assets/asset_exe_006.svg "x vs Cook's distance")
+![Leverage vs RStudent](https://github.com/ericqu/LinearRegression.jl/raw/main/assets/asset_exe_006.svg "Leverage vs RStudent")
+
+![x vs Cook's distance](https://github.com/ericqu/LinearRegression.jl/raw/main/assets/asset_exe_007.svg "x vs Cook's distance")
 
