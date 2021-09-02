@@ -98,7 +98,7 @@ Please post your questions, feedabck or issues in the Issues tabs. As much as po
 # Example
 
 The following is a short example illustrating some statistics about the predicted data.
-First we simulate some data with a polynomial function.
+First, we simulate some data with a polynomial function.
 
 ```julia 
 using LinearRegression, DataFrames, StatsModels
@@ -131,7 +131,7 @@ Terms ╲ Stats │       Coefs      Std err            t     Pr(>|t|)       low
 (Intercept)   │    -24.8724      10.2654     -2.42292    0.0172133     -45.2412     -4.50351          0.0
 x             │     44.7417      2.45391      18.2329  2.06014e-33      39.8727      49.6108          1.0
 ```
-Which is pretty good, so let's further review some diagnostic plots.
+This is pretty good, so let's further review some diagnostic plots.
 
 ```julia
 select(results, [:predicted, :y]) |> @vlplot(
@@ -153,8 +153,7 @@ select(results, [:predicted, :residuals]) |>
 
 ![Predicted vs residuals model 1](https://github.com/ericqu/LinearRegression.jl/raw/main/assets/asset_exe_002.svg "Predicted vs residuals model 1")
 
-Both plots indicating the potential presence a polynomial component.
-Hence one might try to add one by doing the following:
+Both plots are indicating the potential presence of a polynomial component. Hence one might try to add one by doing the following:
 
 ```julia 
 lr = regress(@formula(y ~ 1 + x + x^2 ), vdf)
@@ -180,8 +179,7 @@ Lets look at the updated "predicted vs residuals" plots (same code used):
 
 ![Predicted vs residuals model 2](https://github.com/ericqu/LinearRegression.jl/raw/main/assets/asset_exe_003.svg "Predicted vs residuals model 2")
 
-Which still show a strong pattern. 
-To shorten the analysis we can add the cubic component in the model:
+Which still shows a strong pattern. To shorten the analysis, we can add the cubic component in the model:
 
 ```julia 
 lr = regress(@formula(y ~ 1 + x + x^3 ), vdf)
@@ -209,9 +207,10 @@ And the following Predicted vs Residuals plots:
 Which this time show residuals scatters without an obvious pattern, potentially showing the Normal error component of the model.
 
 Without surprise, the "Predicted vs actual" plot now shows a linear relationship. 
+
 ![Predicted vs actual](https://github.com/ericqu/LinearRegression.jl/raw/main/assets/asset_exe_005.svg "Predicted vs actual, model 3")
 
-To look to outliers of interest additional plots can be used such as: Leverage vs Rstudent (or studentized residual with the current observation deleted), as well as the Cook's Distance.
+Additional plots can be used to find outliers of interest, such as Leverage vs Rstudent (or studentized residual with the current observation deleted) and the Cook's Distance.
 
 ```julia
 threshold_leverage = 2 * lr.p / lr.observations
