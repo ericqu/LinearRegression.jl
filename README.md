@@ -95,3 +95,61 @@ Please post your questions, feedabck or issues in the Issues tabs. As much as po
 - http://hua-zhou.github.io/teaching/biostatm280-2019spring/slides/12-sweep/sweep.html
 - Cook, R. D. (1977). “Detection of Influential Observations in Linear Regression.” Technometrics 19:15–18.
 - Cook, R. D. (1979). “Influential Observations in Linear Regression.” Journal of the American Statistical Association 74:169–174.
+
+
+# Example
+
+The following is a short example illustrating some statistics about the predicted data.
+First we simulate some data with a polynomial function.
+
+```julia 
+using LinearRegression, DataFrames, StatsModels
+using Distributions # for the data generation with Normal()
+using VegaLite # for plotting
+
+# Data simulation
+f(x) = @. (x^3 + 2.2345x - 1.2345 + rand(Normal(0, 3)))
+xs = [x for x in -2:0.1:8]
+ys = f(xs)
+vdf = DataFrame(y=ys, x=xs)
+
+```
+Then we can make the first model and look at the results:
+
+```julia 
+lr = regress(@formula(y ~ 1 + x ), vdf)
+```
+```
+Model definition:  y ~ 1 + x
+Used observations:      101
+Model statistics:
+  R²: 0.770534                  Adjusted R²: 0.768216
+  MSE: 5169.6                   RMSE: 71.8999
+  σ̂²: 5169.6                    AIC: 865.586
+Confidence interval: 95%
+Coefficients statistics:
+Terms ╲ Stats │       Coefs      Std err            t     Pr(>|t|)       low ci      high ci          VIF
+──────────────┼──────────────────────────────────────────────────────────────────────────────────────────
+(Intercept)   │    -24.8724      10.2654     -2.42292    0.0172133     -45.2412     -4.50351          0.0
+x             │     44.7417      2.45391      18.2329  2.06014e-33      39.8727      49.6108          1.0
+```
+Which is pretty good, so let's further review some diagnostic plots.
+
+```julia
+select(results, [:predicted, :y]) |> @vlplot(
+    :point, 
+    x = { :predicted,  axis = {grid = false}},
+    y = { :y, axis = {grid = false}},
+    title = "Predicted vs actual", width = 400, height = 400
+)
+```
+![alt text](https://github.com/ericqu/LinearRegression.jl/raw/main/assets/asset_exe_001.svg "Predicted vs actual model 1")
+
+
+```julia
+select(results, [:predicted, :residuals]) |> 
+        @vlplot(title = "Predicted vs residuals", width = 400, height = 400, x = {axis = {grid = false}}, y = {axis = {grid = false}}   ) +
+        @vlplot(:point, :predicted, :residuals) +
+        @vlplot(mark = {:rule, color = :darkgrey}, y = {datum = 0})
+```
+![alt text](https://github.com/ericqu/LinearRegression.jl/raw/main/assets/asset_exe_002.svg "Predicted vs residuals model 1")
