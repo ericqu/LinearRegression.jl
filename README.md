@@ -93,8 +93,6 @@ Please post your questions, feedabck or issues in the Issues tabs. As much as po
 - https://blogs.sas.com/content/iml/2021/07/14/performance-ls-regression.html
 - https://github.com/joshday/SweepOperator.jl
 - http://hua-zhou.github.io/teaching/biostatm280-2019spring/slides/12-sweep/sweep.html
-- Cook, R. D. (1977). “Detection of Influential Observations in Linear Regression.” Technometrics 19:15–18.
-- Cook, R. D. (1979). “Influential Observations in Linear Regression.” Journal of the American Statistical Association 74:169–174.
 
 
 # Example
