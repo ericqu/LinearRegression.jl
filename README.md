@@ -208,7 +208,7 @@ And the following Predicted vs Residuals plots:
 
 ![alt text](https://github.com/ericqu/LinearRegression.jl/raw/main/assets/asset_exe_004.svg "Predicted vs residuals model 3")
 
-Which this time show a much more linear relationship.
+Which this time show residuals scatters without an obvious pattern, potentially showing the Normal error component of the model.
 
 To look to outliers of interest additional plots can be used such as: Leverage vs Rstudent (or studentized residual with the current observation deleted), as well as the Cook's Distance.
 
