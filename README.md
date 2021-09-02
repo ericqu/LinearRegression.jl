@@ -206,7 +206,7 @@ x ^ 3         │     0.999989    0.00409832       243.999  2.99597e-138      0.
 ```
 And the following Predicted vs Residuals plots:
 
-![alt text](https://github.com/ericqu/LinearRegression.jl/raw/main/assets/asset_exe_004.svg "Predicted vs residuals model 3")
+![Predicted vs residuals model 3](https://github.com/ericqu/LinearRegression.jl/raw/main/assets/asset_exe_004.svg "Predicted vs residuals model 3")
 
 Which this time show residuals scatters without an obvious pattern, potentially showing the Normal error component of the model.
 
@@ -236,7 +236,7 @@ select(results, [:x, :cooksd]) |>
         ) +
     @vlplot(mark = {:rule, color = :darkgrey}, y = {datum = threshold_cooksd})  
 ```
-![alt text](https://github.com/ericqu/LinearRegression.jl/raw/main/assets/asset_exe_004.svg "Leverage vs Rstudent")
+![Leverage vs Rstudent](https://github.com/ericqu/LinearRegression.jl/raw/main/assets/asset_exe_005.svg "Leverage vs Rstudent")
 
-![alt text](https://github.com/ericqu/LinearRegression.jl/raw/main/assets/asset_exe_004.svg "x vs Cook's distance")
+![x vs Cook's distance](https://github.com/ericqu/LinearRegression.jl/raw/main/assets/asset_exe_006.svg "x vs Cook's distance")
 
