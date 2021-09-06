@@ -41,7 +41,7 @@ x             │     27.6201      1.66699      16.5688  2.41337e-12      24.117
 # Contrasts with Julia Stats GLM package
 First, the GLM package provides more than linear regression with Ordinary Least-Squares through the Generalized Linear Model with Maximum Likelihood Estimation.
 
-LinearRegression package only supports models with an intercept, GLM supports models with and without intercept.
+LinearRegression package only support explicit model, GLM supports models which are implicitely with an intercept (event if the user does not provide an intercept one will be added).
 
 LinearRegression does not support analytical weights (however, it is under consideration); GLM supports frequency weights.
 
