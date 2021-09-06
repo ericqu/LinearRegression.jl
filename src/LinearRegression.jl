@@ -113,7 +113,8 @@ function getSST(y, intercept)
     if intercept
         ȳ = mean(y)
         SST = sum(abs2.(y .- ȳ))
-    else # not needed
+    else 
+        SST = sum(abs2.(y))
     end
 
     return SST
@@ -161,7 +162,7 @@ end
 """
 function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame; α::Float64=0.05, req_stats=["all"], remove_missing=false)
     intercept = hasintercept(f)
-    intercept || throw(ArgumentError("Only formulas with intercept are supported. Update the forumla to include an intercept."))
+    # intercept || throw(ArgumentError("Only formulas with intercept are supported. Update the forumla to include an intercept."))
     (α > 0. && α < 1.) || throw(ArgumentError("α must be between 0 and 1"))
 
     copieddf = df 
