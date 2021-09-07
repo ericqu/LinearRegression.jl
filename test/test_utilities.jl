@@ -171,3 +171,7 @@ end
     @test target_present == present
 
 end
+
+@testset "formatting %g" begin
+    @test " MSE: 1.234          " == fmt_pad(" MSE: ", 01.234, 21)
+end
