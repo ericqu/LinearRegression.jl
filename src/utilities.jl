@@ -182,41 +182,6 @@ function get_prediction_stats(req_stats::Vector{Symbol})
 
 end
 
-"""
-    function encapsulate_string(s)
-
-    (internal) Only used to encapsulate a string into an array.
-
-    used exclusively to handle the function ```StatsBase.coefnames``` which sometime return an array or when there is only one element the element alone. 
-"""
-function encapsulate_string(s)
-    if isa(s, String)
-        return [s]
-    end
-    return s
-end
-
-import Printf
-"""
-    macro gprintf(fmt::String)
-    
-    (internal) used to format with %g
-
-    Taken from message published by user o314 at https://discourse.julialang.org/t/printf-with-variable-format-string/3805/6
-"""
-macro gprintf(fmt::String)
-    :((io::IO, arg) -> Printf.@printf(io, $fmt, arg))
-end
-
-"""
-    function fmt_pad(s::String, value, pad=0)
-    (internal) helper to format and pad string for results display
-"""
-function fmt_pad(s::String, value, pad=0)
-    fmt = @gprintf("%g")
-    return rpad(s * sprint(fmt, value), pad)
-end
-
 using NamedArrays
 """
     function my_namedarray_print(io::IO, n::NamedArray)
