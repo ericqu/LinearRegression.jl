@@ -91,9 +91,6 @@ end
     (internal) Calculates the VIF, Variance Inflation Factor, for a given regression.
 """
 function getVIF(x, intercept, p)
-    if p == 2
-        return [0., 1.]
-    end
     if intercept
         return vcat(0, diag(inv(cor(@view(x[:, 2:end])))))
     end
