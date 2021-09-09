@@ -112,9 +112,10 @@ function getSST(y, intercept)
     if intercept
         ȳ = mean(y)
         SST = sum(abs2.(y .- ȳ))
-    else # not needed
+    else 
+        SST = sum(abs2.(y))
     end
-
+    
     return SST
 end
 
