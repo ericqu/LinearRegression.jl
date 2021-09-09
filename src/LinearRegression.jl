@@ -138,15 +138,16 @@ end
 
 
 """
-    function hasintercept(f::StatsModels.FormulaTerm)
-
+    function hasintercept!(f::StatsModels.FormulaTerm)
     (internal) return true when the formula has an intercept term.
-
+    If there is no intercept indicated add one.
+    IF the intercept is specified as absent (y ~ 0 + x) then do not change.
 """
-function hasintercept(f::StatsModels.FormulaTerm)
-    intercept = false
+function hasintercept!(f::StatsModels.FormulaTerm)
+    intercept = true
     if f.rhs isa ConstantTerm{Int64}
         intercept = convert(Bool, f.rhs.n)
+        return intercept
     elseif f.rhs isa Tuple
         for t in f.rhs
             if t isa ConstantTerm{Int64}
@@ -155,6 +156,7 @@ function hasintercept(f::StatsModels.FormulaTerm)
             end
         end
     end
+    f = FormulaTerm(f.lhs, InterceptTerm{true}() + f.rhs)
     return intercept
 end
 
@@ -164,8 +166,8 @@ end
     Estimate the coefficients of the regression, given a dataset and a formula. 
 """
 function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame; α::Float64=0.05, req_stats=["all"], remove_missing=false)
-    intercept = hasintercept(f)
-    intercept || throw(ArgumentError("Only formulas with intercept are supported. Update the forumla to include an intercept."))
+    intercept = hasintercept!(f)
+
     (α > 0. && α < 1.) || throw(ArgumentError("α must be between 0 and 1"))
 
     copieddf = df 
