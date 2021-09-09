@@ -83,6 +83,10 @@ function Base.show(io::IO, lr::linRegRes)
         (StatsBase.coefnames(lr.updformula.rhs), all_stats_name) , ("Terms", "Stats"))
     
     println(io, "Coefficients statistics:")
+    na = NamedArray(reduce(hcat, all_stats))
+    setnames!(na, encapsulate_string(string.(StatsBase.coefnames(lr.updformula.rhs))), 1 )
+    setnames!(na, encapsulate_string(all_stats_name), 2 )
+    setdimnames!(na, ("Terms", "Stats"))
     my_namedarray_print(io, na)
 end
 
