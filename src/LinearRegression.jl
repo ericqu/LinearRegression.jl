@@ -2,7 +2,7 @@ module LinearRegression
 
 export regress, predict_and_stats
 
-using Base: Tuple, Int64
+using Base: Tuple, Int64, String
 using StatsBase:eltype, isapprox, length, coefnames
 using Distributions
 using Printf, NamedArrays
@@ -43,24 +43,28 @@ end
     Display information about the fitted model
 """
 function Base.show(io::IO, lr::linRegRes) 
+    padsize = 24
     println(io, "Model definition:\t", lr.modelformula)
     println(io, "Used observations:\t", lr.observations)
     println(io, "Model statistics:")
     # Display stats when available
     if !isnothing(lr.R2) && !isnothing(lr.ADJR2)
-        @printf(io, "  R²: %g\t\t\tAdjusted R²: %g\n", lr.R2, lr.ADJR2)
+        print(io, fmt_pad("  R²: ", lr.R2, padsize) * fmt_pad("Adjusted R²: ", lr.ADJR2) * "\n")
+        # @printf(io, "  R²: %g\t\t\tAdjusted R²: %g\n", lr.R2, lr.ADJR2)
     elseif !isnothing(lr.R2) 
         @printf(io, "  R²: %g\n", lr.R2)
     end
 
     if !isnothing(lr.MSE) && !isnothing(lr.RMSE)
-        @printf(io, "  MSE: %g\t\t\tRMSE: %g\n", lr.MSE, lr.RMSE)
+        print(io, fmt_pad("  MSE: ", lr.MSE, padsize) * fmt_pad("RMSE: ", lr.RMSE) * "\n")
+        # @printf(io, "  MSE: %g\t\t\tRMSE: %g\n", lr.MSE, lr.RMSE)
     elseif !isnothing(lr.MSE)
         @printf(io, "  MSE: %g\n", lr.MSE)
     end
 
     if !isnothing(lr.σ̂²) && !isnothing(lr.AIC)
-        @printf(io, "  σ̂²: %g\t\t\tAIC: %g\n", lr.σ̂², lr.AIC)
+        print(io, fmt_pad("  σ̂²: ", lr.σ̂², padsize+1) * fmt_pad("AIC: ", lr.AIC) * "\n")
+        # @printf(io, "  σ̂²: %g\t\t\tAIC: %g\n", lr.σ̂², lr.AIC)
     elseif !isnothing(lr.σ̂²)
         @printf(io, "  σ̂²: %g\n", lr.σ̂²)
     elseif !isnothing(lr.AIC)
@@ -68,7 +72,7 @@ function Base.show(io::IO, lr::linRegRes)
     end
     
     if !isnothing(lr.ci_low) || !isnothing(lr.ci_up)
-        @printf(io, "Confidence interval: %g%%\n", (1 - lr.alpha)*100 )
+        @printf(io, "Confidence interval:\t%g%%\n", (1 - lr.alpha)*100 )
     end
 
     all_stats = [lr.coefs, lr.stderrors, lr.t_values, lr.p_values, lr.ci_low, lr.ci_up, lr.VIF]
@@ -77,13 +81,14 @@ function Base.show(io::IO, lr::linRegRes)
     todelete = [i for (i, v) in enumerate(all_stats) if isnothing(v)]
     deleteat!(all_stats, todelete)
     deleteat!(all_stats_name, todelete)
-
-    na = NamedArray(
-        reduce(hcat, all_stats),
-        (StatsBase.coefnames(lr.updformula.rhs), all_stats_name) , ("Terms", "Stats"))
     
     println(io, "Coefficients statistics:")
+    na = NamedArray(reduce(hcat, all_stats))
+    setnames!(na, encapsulate_string(StatsBase.coefnames(lr.updformula.rhs)), 1 )
+    setnames!(na, encapsulate_string(all_stats_name), 2 )
+    setdimnames!(na, ("Terms", "Stats"))
     my_namedarray_print(io, na)
+    
 end
 
 """
@@ -113,7 +118,8 @@ function getSST(y, intercept)
     if intercept
         ȳ = mean(y)
         SST = sum(abs2.(y .- ȳ))
-    else # not needed
+    else 
+        SST = sum(abs2.(y))
     end
 
     return SST
@@ -134,15 +140,18 @@ end
 
 
 """
-    function hasintercept(f::StatsModels.FormulaTerm)
+    function hasintercept!(f::StatsModels.FormulaTerm)
 
     (internal) return true when the formula has an intercept term.
+    If there is no intercept indicated add one.
+    IF the intercept is specified as absent (y ~ 0 + x) then do not change.
 
 """
-function hasintercept(f::StatsModels.FormulaTerm)
-    intercept = false
+function hasintercept!(f::StatsModels.FormulaTerm)
+    intercept = true
     if f.rhs isa ConstantTerm{Int64}
         intercept = convert(Bool, f.rhs.n)
+        return intercept
     elseif f.rhs isa Tuple
         for t in f.rhs
             if t isa ConstantTerm{Int64}
@@ -151,6 +160,7 @@ function hasintercept(f::StatsModels.FormulaTerm)
             end
         end
     end
+    f = FormulaTerm(f.lhs, InterceptTerm{true}() + f.rhs)
     return intercept
 end
 
@@ -160,8 +170,8 @@ end
     Estimate the coefficients of the regression, given a dataset and a formula. 
 """
 function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame; α::Float64=0.05, req_stats=["all"], remove_missing=false)
-    intercept = hasintercept(f)
-    intercept || throw(ArgumentError("Only formulas with intercept are supported. Update the forumla to include an intercept."))
+    intercept = hasintercept!(f)
+    # intercept || throw(ArgumentError("Only formulas with intercept are supported. Update the forumla to include an intercept."))
     (α > 0. && α < 1.) || throw(ArgumentError("α must be between 0 and 1"))
 
     copieddf = df 
