@@ -189,11 +189,19 @@ end
 
     used exclusively to handle the function ```StatsBase.coefnames``` which sometime return an array or when there is only one element the element alone. 
 """
-function encapsulate_string(s)
-    if isa(s, String)
-        return [s]
-    end
-    return s
+function encapsulate_string(s::String)
+    return [s]
+end
+
+"""
+    function encapsulate_string(v)
+
+    (internal) Only used to encapsulate a string into an array.
+
+    used exclusively to handle the function ```StatsBase.coefnames``` which sometime return an array or when there is only one element the element alone. 
+"""
+function encapsulate_string(v::Vector{String})
+    return v
 end
 
 import Printf

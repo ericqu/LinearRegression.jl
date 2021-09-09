@@ -7,4 +7,6 @@
     @test isapprox(0.9252939081, lrnoint.R2)
     @test isapprox(0.9237997863, lrnoint.ADJR2)
     @test isapprox(160.90768623, lrnoint.AIC)
+
+    # TODO add a test case for multiple linear regression without intercept and the VIF
 end
