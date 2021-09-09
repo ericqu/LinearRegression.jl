@@ -77,7 +77,6 @@ function Base.show(io::IO, lr::linRegRes)
     todelete = [i for (i, v) in enumerate(all_stats) if isnothing(v)]
     deleteat!(all_stats, todelete)
     deleteat!(all_stats_name, todelete)
-
     println(io, "Coefficients statistics:")
     na = NamedArray(reduce(hcat, all_stats))
     setnames!(na, encapsulate_string(string.(StatsBase.coefnames(lr.updformula.rhs))), 1 )
