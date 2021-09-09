@@ -1,3 +1,7 @@
+# using DataFrames, CSV
+
+# include("../src/LinearRegression.jl")
+
 @testset "Cook's Distance" begin 
         st_df = DataFrame( 
                 Y=[6.4, 7.4, 10.4, 15.1, 12.3 , 11.4],
