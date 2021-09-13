@@ -12,11 +12,12 @@ using StatsModels, DataFrames
 
 include("sweep_operator.jl")
 include("utilities.jl")
+include("newey_west.jl")
 
 struct linRegRes 
     extended_inverse::Matrix                # Store the extended inverse matrix 
     coefs::Union{Nothing,Vector}            # Store the coefficients of the fitted model
-    white_type::Union{Nothing,Symbol}      # Store the type of White's covariance estimator used
+    white_type::Union{Nothing,Symbol}       # Store the type of White's covariance estimator used
     stderrors::Union{Nothing,Vector}        # Store the standard errors for the fitted model
     white_stderrors::Union{Nothing,Vector}  # Store the standard errors modified for the White's covariance estimator
     nw_stderrors::Union{Nothing,Vector}     # Store the standard errors modified for the Newey-West covariance estimator
@@ -98,8 +99,8 @@ function Base.show(io::IO, lr::linRegRes)
 
     if lr.white_type != :unknown 
         println(io, "\n\nWhite's covariance estimator ($(Base.Unicode.uppercase(string(lr.white_type)))):")
-        all_white_stats = [lr.white_stderrors, lr.white_t_values, lr.white_p_values]
-        all_white_stats_name = ["Std err", "t", "Pr(>|t|)"]
+        all_white_stats = [lr.coefs, lr.white_stderrors, lr.white_t_values, lr.white_p_values]
+        all_white_stats_name = ["Coefs", "Std err", "t", "Pr(>|t|)"]
         todelete = [i for (i, v) in enumerate(all_white_stats) if isnothing(v)]
         deleteat!(all_white_stats, todelete)
         deleteat!(all_white_stats_name, todelete)
@@ -110,6 +111,24 @@ function Base.show(io::IO, lr::linRegRes)
         na = NamedArray(m_all_stats_white)
         setnames!(na, encapsulate_string(string.(StatsBase.coefnames(lr.updformula.rhs))), 1)
         setnames!(na, encapsulate_string(string.(all_white_stats_name)), 2)
+        setdimnames!(na, ("Terms", "Stats"))
+        my_namedarray_print(io, na)
+    end
+
+    if !isnothing(lr.nw_stderrors) 
+        println(io, "\n\nNewey-West's covariance estimator:")
+        all_hac_stats = [lr.coefs, lr.nw_stderrors, lr.nw_t_values, lr.nw_p_values]
+        all_hac_stats_name = ["Coefs", "Std err", "t", "Pr(>|t|)"]
+        todelete = [i for (i, v) in enumerate(all_hac_stats) if isnothing(v)]
+        deleteat!(all_hac_stats, todelete)
+        deleteat!(all_hac_stats_name, todelete)
+        m_all_stats_hac = reduce(hcat, all_hac_stats)
+        if m_all_stats_hac isa Vector
+            m_all_stats_hac = reshape(m_all_stats_hac, length(m_all_stats_hac), 1)
+        end
+        na = NamedArray(m_all_stats_hac)
+        setnames!(na, encapsulate_string(string.(StatsBase.coefnames(lr.updformula.rhs))), 1)
+        setnames!(na, encapsulate_string(string.(all_hac_stats_name)), 2)
         setdimnames!(na, ("Terms", "Stats"))
         my_namedarray_print(io, na)
     end
@@ -261,9 +280,6 @@ function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame; α::Float
     end
 
     # robust estimators stats
-    requested_robust_stats = Set([:stderror])
-    :p_values in needed_stats && push!(requested_robust_stats, :p_values)
-    :t_values in needed_stats && push!(requested_robust_stats, :t_values)
     needed_white, needed_hac = get_needed_robust_cov_stats(cov)
     white_type = :unknown
 
@@ -278,12 +294,23 @@ function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame; α::Float
         end
     end
 
+    if !isnothing(needed_hac)
+        newey_std = HAC(needed_hac, x, y, coefs, intercept, n, p)
+        vector_stats[:nw_stderrors] = newey_std
+        if !isnothing(get(vector_stats, :t_values, nothing))
+            vector_stats[:nw_t_values] = coefs ./ vector_stats[:nw_stderrors]
+        end
+        if !isnothing(get(vector_stats, :p_values, nothing))
+            vector_stats[:nw_p_values] = ccdf.(Ref(FDist(1., (n - p))), abs2.(vector_stats[:nw_t_values]))
+        end
+    end
+
     sres = linRegRes(xytxy, coefs, white_type,
-                get(vector_stats, :stderror, nothing), get(vector_stats, :white_stderrors, nothing), nothing, 
-                get(vector_stats, :t_values, nothing), get(vector_stats, :white_t_values, nothing), nothing,
+                get(vector_stats, :stderror, nothing), get(vector_stats, :white_stderrors, nothing), get(vector_stats, :nw_stderrors, nothing), 
+                get(vector_stats, :t_values, nothing), get(vector_stats, :white_t_values, nothing), get(vector_stats, :nw_t_values, nothing),
                 p, mse, intercept, get(scalar_stats, :r2, nothing),
                 get(scalar_stats, :adjr2, nothing), get(scalar_stats, :rmse, nothing), get(scalar_stats, :aic, nothing), get(scalar_stats, :sigma, nothing),
-                get(vector_stats, :p_values, nothing), get(vector_stats, :white_p_values, nothing), nothing,
+                get(vector_stats, :p_values, nothing), get(vector_stats, :white_p_values, nothing), get(vector_stats, :nw_p_values, nothing),
                 haskey(vector_stats, :ci) ? coefs .+ vector_stats[:ci] : nothing, 
                 haskey(vector_stats, :ci) ? coefs .- vector_stats[:ci] : nothing, 
                 n, get(scalar_stats, :t_statistic, nothing), get(vector_stats, :vif, nothing), f, dataschema, updatedformula, α)
@@ -291,8 +318,19 @@ function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame; α::Float
     return sres
 end
 
-function heteroscedasticity(t::Symbol, x, y, coefs, intercept, n, p)
+function HAC(t::Symbol, x, y, coefs, intercept, n, p)
+    inv_xtx = inv(x' * x)
+    e = y - lr_predict(x, coefs, intercept)
+    xe = x .* e
+    return sqrt.(diag(n * inv_xtx * newey_west(xe) * inv_xtx))
+end
 
+"""
+    function heteroscedasticity(t::Symbol, x, y, coefs, intercept, n, p)
+
+    (Internal) Compute the standard errors modified for the White's covariance estimator
+"""
+function heteroscedasticity(t::Symbol, x, y, coefs, intercept, n, p)
     inv_xtx = inv(x' * x)
     e = y - lr_predict(x, coefs, intercept)
 
@@ -321,7 +359,7 @@ function heteroscedasticity(t::Symbol, x, y, coefs, intercept, n, p)
         xetxe = xe' * xe
         return (:hc3, sqrt.(diag(inv_xtx * xetxe * inv_xtx)))
     else
-        throw(error("Unknown symbol white the White's covariance estimator"))
+        throw(error("Unknown symbol ($(t)) used as the White's covariance estimator"))
     end
 
 end
