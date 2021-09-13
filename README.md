@@ -54,7 +54,6 @@ The Akaike information criterion (AIC) is calculated with the formula relevant o
 # List of Statistics 
 ## List of Statistics calculated about the linear regression model:
 - AIC: Akaike information criterion with the formula AIC=n log(SSE / n) + 2p; where SSE is the Sum of Squared Errors and p is the number of predictors.
-- P values for each predictor.
 - SSE Sum of Squared Errors as the output from the sweep operator.
 - SST as the Total Sum of Squares as the sum over all squared differences between the observations and their overall mean.
 - R² as 1 - SSE/SST.
@@ -65,8 +64,9 @@ The Akaike information criterion (AIC) is calculated with the formula relevant o
 - The t-statistic.
 - The mean squared error.
 - The root of the mean squared error.
-- The standard errors.
-- The t values.
+- The standard errors and their equivalent with a White's covariance estimator
+- The t values and their equivalent with a White's covariance estimator
+- P values for each predictor and their equivalent with a White's covariance estimator
 
 ## List of Statistics about the predicted values:
 - The predicted values
