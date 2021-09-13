@@ -1,5 +1,6 @@
 module LinearRegression
 
+using Distributions:length
 export regress, predict_and_stats
 
 using Base: Tuple, Int64
@@ -15,8 +16,13 @@ include("utilities.jl")
 struct linRegRes 
     extended_inverse::Matrix                # Store the extended inverse matrix 
     coefs::Union{Nothing,Vector}            # Store the coefficients of the fitted model
+    white_type::Union{Nothing,Symbol}      # Store the type of White's covariance estimator used
     stderrors::Union{Nothing,Vector}        # Store the standard errors for the fitted model
+    white_stderrors::Union{Nothing,Vector}  # Store the standard errors modified for the White's covariance estimator
+    nw_stderrors::Union{Nothing,Vector}     # Store the standard errors modified for the Newey-West covariance estimator
     t_values::Union{Nothing,Vector}         # Store the t values for the fitted model
+    white_t_values::Union{Nothing,Vector}   # Store the t values modified for the White's covariance estimator
+    nw_t_values::Union{Nothing,Vector}      # Store the t values modified for the Newey-West covariance estimator
     p::Int64                                # Store the number of parameters (including the intercept as a parameter)
     MSE::Union{Nothing,Float64}             # Store the Mean squared error for the fitted model
     intercept::Bool                         # Indicate if the model has an intercept
@@ -26,6 +32,8 @@ struct linRegRes
     AIC::Union{Nothing,Float64}             # Store the Akaike information criterion for the fitted model
     σ̂²::Union{Nothing,Float64}              # Store the σ̂² for the fitted model
     p_values::Union{Nothing,Vector}         # Store the p values for the fitted model
+    white_p_values::Union{Nothing,Vector}   # Store the p values modified for the White's covariance estimator
+    nw_p_values::Union{Nothing,Vector}      # Store the p values modified for the Newey-West covariance estimator
     ci_up::Union{Nothing,Vector}            # Store the upper values confidence interval of the coefficients 
     ci_low::Union{Nothing,Vector}           # Store the lower values confidence interval of the coefficients 
     observations                            # Store the number of observations used in the model
@@ -68,7 +76,7 @@ function Base.show(io::IO, lr::linRegRes)
     end
     
     if !isnothing(lr.ci_low) || !isnothing(lr.ci_up)
-        @printf(io, "Confidence interval: %g%%\n", (1 - lr.alpha)*100 )
+        @printf(io, "Confidence interval: %g%%\n", (1 - lr.alpha) * 100 )
     end
 
     all_stats = [lr.coefs, lr.stderrors, lr.t_values, lr.p_values, lr.ci_low, lr.ci_up, lr.VIF]
@@ -78,11 +86,33 @@ function Base.show(io::IO, lr::linRegRes)
     deleteat!(all_stats, todelete)
     deleteat!(all_stats_name, todelete)
     println(io, "Coefficients statistics:")
-    na = NamedArray(reduce(hcat, all_stats))
-    setnames!(na, encapsulate_string(string.(StatsBase.coefnames(lr.updformula.rhs))), 1 )
-    setnames!(na, encapsulate_string(string.(all_stats_name)), 2 )
+    m_all_stats = reduce(hcat, all_stats)
+    if m_all_stats isa Vector
+        m_all_stats = reshape(m_all_stats, length(m_all_stats), 1)
+    end
+    na = NamedArray(m_all_stats)
+    setnames!(na, encapsulate_string(string.(StatsBase.coefnames(lr.updformula.rhs))), 1)
+    setnames!(na, encapsulate_string(string.(all_stats_name)), 2)
     setdimnames!(na, ("Terms", "Stats"))
     my_namedarray_print(io, na)
+
+    if lr.white_type != :unknown 
+        println(io, "\n\nWhite's covariance estimator ($(Base.Unicode.uppercase(string(lr.white_type)))):")
+        all_white_stats = [lr.white_stderrors, lr.white_t_values, lr.white_p_values]
+        all_white_stats_name = ["Std err", "t", "Pr(>|t|)"]
+        todelete = [i for (i, v) in enumerate(all_white_stats) if isnothing(v)]
+        deleteat!(all_white_stats, todelete)
+        deleteat!(all_white_stats_name, todelete)
+        m_all_stats_white = reduce(hcat, all_white_stats)
+        if m_all_stats_white isa Vector
+            m_all_stats_white = reshape(m_all_stats_white, length(m_all_stats_white), 1)
+        end
+        na = NamedArray(m_all_stats_white)
+        setnames!(na, encapsulate_string(string.(StatsBase.coefnames(lr.updformula.rhs))), 1)
+        setnames!(na, encapsulate_string(string.(all_white_stats_name)), 2)
+        setdimnames!(na, ("Terms", "Stats"))
+        my_namedarray_print(io, na)
+    end
 end
 
 """
@@ -158,7 +188,7 @@ end
 
     Estimate the coefficients of the regression, given a dataset and a formula. 
 """
-function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame; α::Float64=0.05, req_stats=["all"], remove_missing=false)
+function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame; α::Float64=0.05, req_stats=["all"], remove_missing=false, cov=[:none])
     intercept = hasintercept!(f)
 
     (α > 0. && α < 1.) || throw(ArgumentError("α must be between 0 and 1"))
@@ -230,14 +260,70 @@ function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame; α::Float
         vector_stats[:vif] = getVIF(x, intercept, p)
     end
 
-    sres = linRegRes(xytxy, coefs, get(vector_stats, :stderror, nothing), get(vector_stats, :t_values, nothing), p, mse, intercept, get(scalar_stats, :r2, nothing),
+    # robust estimators stats
+    requested_robust_stats = Set([:stderror])
+    :p_values in needed_stats && push!(requested_robust_stats, :p_values)
+    :t_values in needed_stats && push!(requested_robust_stats, :t_values)
+    needed_white, needed_hac = get_needed_robust_cov_stats(cov)
+    white_type = :unknown
+
+    if !isnothing(needed_white)
+        white_type, white_std = heteroscedasticity(needed_white, x, y, coefs, intercept, n, p)
+        vector_stats[:white_stderrors] = white_std
+        if !isnothing(get(vector_stats, :t_values, nothing))
+            vector_stats[:white_t_values] = coefs ./ vector_stats[:white_stderrors]
+        end
+        if !isnothing(get(vector_stats, :p_values, nothing))
+            vector_stats[:white_p_values] = ccdf.(Ref(FDist(1., (n - p))), abs2.(vector_stats[:white_t_values]))
+        end
+    end
+
+    sres = linRegRes(xytxy, coefs, white_type,
+                get(vector_stats, :stderror, nothing), get(vector_stats, :white_stderrors, nothing), nothing, 
+                get(vector_stats, :t_values, nothing), get(vector_stats, :white_t_values, nothing), nothing,
+                p, mse, intercept, get(scalar_stats, :r2, nothing),
                 get(scalar_stats, :adjr2, nothing), get(scalar_stats, :rmse, nothing), get(scalar_stats, :aic, nothing), get(scalar_stats, :sigma, nothing),
-                get(vector_stats, :p_values, nothing), 
+                get(vector_stats, :p_values, nothing), get(vector_stats, :white_p_values, nothing), nothing,
                 haskey(vector_stats, :ci) ? coefs .+ vector_stats[:ci] : nothing, 
                 haskey(vector_stats, :ci) ? coefs .- vector_stats[:ci] : nothing, 
                 n, get(scalar_stats, :t_statistic, nothing), get(vector_stats, :vif, nothing), f, dataschema, updatedformula, α)
 
     return sres
+end
+
+function heteroscedasticity(t::Symbol, x, y, coefs, intercept, n, p)
+
+    inv_xtx = inv(x' * x)
+    e = y - lr_predict(x, coefs, intercept)
+
+    if t == :white && n < 250  
+        t = :hc3
+    end
+
+    if t == :hc0
+        xe = x .* e
+        xetxe = xe' * xe    
+        return (:hc0, sqrt.(diag(inv_xtx * xetxe * inv_xtx)))
+    elseif t == :hc1
+        xe = x .* e
+        xetxe = xe' * xe    
+        return (:hc1, (n / (n - p)) .* sqrt.(diag(inv_xtx * xetxe * inv_xtx)))
+    elseif t == :hc2
+        leverage = diag(x * inv(x'x) * x')
+        e = @.( e / (1. - leverage))
+        xe = x .* e
+        xetxe = xe' * xe
+        return (:hc2, sqrt.(diag(inv_xtx * xetxe * inv_xtx)))
+    elseif t == :hc3
+        leverage = diag(x * inv(x'x) * x')
+        e = @.( e / ((1. - leverage)^2) )
+        xe = x .* e
+        xetxe = xe' * xe
+        return (:hc3, sqrt.(diag(inv_xtx * xetxe * inv_xtx)))
+    else
+        throw(error("Unknown symbol white the White's covariance estimator"))
+    end
+
 end
 
 """

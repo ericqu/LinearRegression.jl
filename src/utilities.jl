@@ -1,3 +1,46 @@
+"""  
+    get_robust_cov_stats()
+
+    Return all robust covariance estimators.
+"""
+get_all_robust_cov_stats() = Set([:white, :nw, :hc0, :hc1, :hc2, :hc3])
+get_needed_robust_cov_stats(s::String) = return get_needed_robust_cov_stat([s])
+get_needed_robust_cov_stats(s::Symbol) = return get_needed_robust_cov_stat(Set([s]))
+get_needed_robust_cov_stats(s::Vector{String}) = return get_needed_robust_cov_stats(Symbol.(lowercase.(s)))
+get_needed_robust_cov_stats(::Vector{Any}) = return get_needed_robust_cov_stat([:none])
+get_needed_robust_cov_stats(::Set{Any}) = return get_needed_robust_cov_stat(Set([:none])) 
+get_needed_robust_cov_stats(s::Set{Symbol}) = return get_needed_robust_cov_stat(collect(s)) 
+
+function get_needed_robust_cov_stats(s::Vector{Symbol})
+    
+    length(s) == 0 && return (nothing, nothing)
+    :none in s && return (nothing, nothing)
+    
+    needed_white::Union{Nothing, Symbol} = :invalid
+    needed_hac::Union{Nothing, Symbol} = :invalid
+    if :white in s 
+        needed_white = :white
+    elseif :hc0 in s 
+        needed_white = :hc0
+    elseif :hc1 in s 
+        needed_white = :hc1
+    elseif :hc2 in s 
+        needed_white = :hc2
+    elseif :hc3 in s 
+        needed_white = :hc3
+    else 
+        needed_white= nothing
+    end
+
+    if :nw in s
+        needed_hac = :nw
+    else
+        needed_hac = nothing
+    end
+
+    return return (needed_white, needed_hac)
+
+end
 
 """
     get_all_model_stats()
@@ -6,21 +49,12 @@
 """
 get_all_model_stats() = Set([:coefs, :sse, :mse, :sst, :rmse, :aic, :sigma, :t_statistic, :vif, :r2, :adjr2, :stderror, :t_values, :p_values, :ci])
 
-function get_needed_model_stats(req_stats::Vector{String})
-    return get_needed_model_stats(Symbol.(lowercase.(req_stats)))    
-end
-
-function get_needed_model_stats(::Vector{Any})
-    return get_needed_model_stats(["none"])
-end
-
-function get_needed_model_stats(::Set{Any})
-    return get_needed_model_stats(Set([:none]))
-end
-
-function get_needed_model_stats(req_stats::Set{Symbol})
-    return get_needed_model_stats(collect(req_stats))
-end
+get_needed_model_stats(req_stats::String) = return get_needed_model_stats([req_stats])
+get_needed_model_stats(req_stats::Symbol) = return get_needed_model_stats(Set([req_stats]))
+get_needed_model_stats(req_stats::Vector{String}) = return get_needed_model_stats(Symbol.(lowercase.(req_stats)))
+get_needed_model_stats(::Vector{Any}) = return get_needed_model_stats([:none])
+get_needed_model_stats(::Set{Any}) = return get_needed_model_stats(Set([:none]))
+get_needed_model_stats(req_stats::Set{Symbol}) = get_needed_model_stats(collect(req_stats))
 
 """
     get_needed_model_stats(req_stats::Vector{Symbol})
@@ -84,21 +118,11 @@ end
 """
 get_all_prediction_stats() = Set([:predicted, :residuals, :leverage, :stdp, :stdi, :stdr, :student, :rstudent, :lcli, :ucli, :lclp, :uclp, :press, :cooksd])
 
-function get_prediction_stats(req_stats::Vector{String})
-    return get_prediction_stats(Symbol.(lowercase.(req_stats)))    
-end
-
-function get_prediction_stats(::Vector{Any})
-    return get_prediction_stats(["none"])
-end
-
-function get_prediction_stats(::Set{Any})
-    return get_prediction_stats(Set([:none]))
-end
-
-function get_prediction_stats(req_stats::Set{Symbol})
-    return get_prediction_stats(collect(req_stats))
-end
+get_prediction_stats(req_stats::String) = return get_prediction_stats([req_stats]) 
+get_prediction_stats(req_stats::Vector{String}) = return get_prediction_stats(Symbol.(lowercase.(req_stats))) 
+get_prediction_stats(::Vector{Any}) = return get_prediction_stats([:none])
+get_prediction_stats(::Set{Any}) = return get_prediction_stats(Set([:none]))
+get_prediction_stats(req_stats::Set{Symbol}) = return get_prediction_stats(collect(req_stats))
 
 """
     function get_prediction_stats(req_stats::Vector{Symbol})
@@ -236,3 +260,4 @@ function my_namedarray_print(io::IO, n::NamedArray)
     show(tmpio, n)
     print(io, split(String(take!(tmpio)), "\n", limit=2)[2])
 end
+
