@@ -139,11 +139,26 @@ end
 
     (internal) Calculates the VIF, Variance Inflation Factor, for a given regression.
 """
-function getVIF(x, intercept, p)
+function getVIF(x, intercept, updf, df, p)
     if intercept
+        if p == 1
+            return [0., 1]
+        end
         return vcat(0, diag(inv(cor(@view(x[:, 2:end])))))
+    else 
+        if p == 1
+            return [0]
+        end
+        vt = Symbol.(StatsBase.coefnames(updf.rhs))
+        results = Vector{Float64}(undef, length(vt))
+        for (i, ct) in enumerate(vt)
+            tf = Term(ct) ~ term(0) + sum(term.(setdiff(vt, [ct])))
+            cr = regress(tf, df, req_stats=[:r2])
+            results[i] = 1. / (1. - cr.R2)
+        end
+        return results
     end
-    return diag(inv(cor(x)))
+    # return diag(inv(cor(x)))
 end
 
 """
@@ -276,7 +291,7 @@ function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame; α::Float
         vector_stats[:ci] = vector_stats[:stderror] * scalar_stats[:t_statistic]
     end
     if :vif in needed_stats
-        vector_stats[:vif] = getVIF(x, intercept, p)
+        vector_stats[:vif] = getVIF(x, intercept, updatedformula, copieddf, p)
     end
 
     # robust estimators stats
@@ -406,7 +421,7 @@ function predict_and_stats(lr::linRegRes, df::DataFrames.DataFrame; α=0.05, req
     end
     if :stdr in needed
         if isnothing(lr.σ̂²)
-            throw(ArgumentError(":stdi requires that the σ̂² (:sigma) was previously calculated through the regression"))
+            throw(ArgumentError(":stdr requires that the σ̂² (:sigma) was previously calculated through the regression"))
         end
         needed_stats[:stdr] = sqrt.((1. .- needed_stats[:leverage]) .* lr.σ̂²)
     end
