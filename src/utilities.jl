@@ -4,39 +4,31 @@
     Return all robust covariance estimators.
 """
 get_all_robust_cov_stats() = Set([:white, :nw, :hc0, :hc1, :hc2, :hc3])
-get_needed_robust_cov_stats(s::String) = return get_needed_robust_cov_stat([s])
-get_needed_robust_cov_stats(s::Symbol) = return get_needed_robust_cov_stat(Set([s]))
+get_needed_robust_cov_stats(s::String) = return get_needed_robust_cov_stats([s])
+get_needed_robust_cov_stats(s::Symbol) = return get_needed_robust_cov_stats([s])
 get_needed_robust_cov_stats(s::Vector{String}) = return get_needed_robust_cov_stats(Symbol.(lowercase.(s)))
-get_needed_robust_cov_stats(::Vector{Any}) = return get_needed_robust_cov_stat([:none])
-get_needed_robust_cov_stats(::Set{Any}) = return get_needed_robust_cov_stat(Set([:none])) 
-get_needed_robust_cov_stats(s::Set{Symbol}) = return get_needed_robust_cov_stat(collect(s)) 
+get_needed_robust_cov_stats(::Vector{Any}) = return get_needed_robust_cov_stats([:none])
+get_needed_robust_cov_stats(::Set{Any}) = return get_needed_robust_cov_stats(Set([:none])) 
+get_needed_robust_cov_stats(s::Set{Symbol}) = return get_needed_robust_cov_stats(collect(s)) 
 
 function get_needed_robust_cov_stats(s::Vector{Symbol})
     
-    length(s) == 0 && return (nothing, nothing)
-    :none in s && return (nothing, nothing)
-    
-    needed_white::Union{Nothing, Symbol} = :invalid
-    needed_hac::Union{Nothing, Symbol} = :invalid
-    if :white in s 
-        needed_white = :white
-    elseif :hc0 in s 
-        needed_white = :hc0
-    elseif :hc1 in s 
-        needed_white = :hc1
-    elseif :hc2 in s 
-        needed_white = :hc2
-    elseif :hc3 in s 
-        needed_white = :hc3
-    else 
-        needed_white= nothing
-    end
+    needed_white = Vector{Symbol}()
+    needed_hac = Vector{Symbol}()
 
-    if :nw in s
-        needed_hac = :nw
-    else
-        needed_hac = nothing
+    length(s) == 0 && return (needed_white, needed_hac)
+    :none in s && return (needed_white, needed_hac)
+    if :all in s 
+        s = collect(get_all_robust_cov_stats())
     end
+    
+    :white in s && push!(needed_white, :white)
+    :hc0 in s && push!(needed_white, :hc0)
+    :hc1 in s && push!(needed_white, :hc1)
+    :hc2 in s && push!(needed_white, :hc2)
+    :hc3 in s && push!(needed_white, :hc3)
+
+    :nw in s && push!(needed_hac, :nw)
 
     return return (needed_white, needed_hac)
 
