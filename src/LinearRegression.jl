@@ -90,66 +90,27 @@ function Base.show(io::IO, lr::linRegRes)
     end
 
     if length(lr.white_types) + length(lr.hac_types) == 0
-        all_stats = [lr.coefs, lr.stderrors, lr.t_values, lr.p_values, lr.ci_low, lr.ci_up, lr.VIF]
-        all_stats_name = ["Coefs", "Std err", "t", "Pr(>|t|)", "low ci", "high ci", "VIF"]
-
-        todelete = [i for (i, v) in enumerate(all_stats) if isnothing(v)]
-        deleteat!(all_stats, todelete)
-        deleteat!(all_stats_name, todelete)
-        println(io, "Coefficients statistics:")
-        m_all_stats = reduce(hcat, all_stats)
-        if m_all_stats isa Vector
-            m_all_stats = reshape(m_all_stats, length(m_all_stats), 1)
-        end
-        na = NamedArray(m_all_stats)
-        setnames!(na, encapsulate_string(string.(StatsBase.coefnames(lr.updformula.rhs))), 1)
-        setnames!(na, encapsulate_string(string.(all_stats_name)), 2)
-        setdimnames!(na, ("Terms", "Stats"))
-        my_namedarray_print(io, na)
+        helper_print_table(io, "Coefficients statistics:", 
+            [lr.coefs, lr.stderrors, lr.t_values, lr.p_values, lr.ci_low, lr.ci_up, lr.VIF],
+            ["Coefs", "Std err", "t", "Pr(>|t|)", "low ci", "high ci", "VIF"], 
+            lr.updformula)
     end
 
     if length(lr.white_types) > 0
         for (cur_i, cur_type) in enumerate(lr.white_types)
-            println(io, "\n\nWhite's covariance estimator ($(Base.Unicode.uppercase(string(cur_type)))):")
-
-            all_white_stats = [lr.coefs, lr.white_stderrors[cur_i], lr.white_t_values[cur_i], lr.white_p_values[cur_i], lr.white_ci_low[cur_i], lr.white_ci_up[cur_i] ]
-            all_white_stats_name = ["Coefs", "Std err", "t", "Pr(>|t|)", "low ci", "high ci" ]
-    
-            todelete = [i for (i, v) in enumerate(all_white_stats) if isnothing(v)]
-            
-            deleteat!(all_white_stats, todelete)
-            deleteat!(all_white_stats_name, todelete)
-            m_all_stats_white = reduce(hcat, all_white_stats)
-           
-            if m_all_stats_white isa Vector
-                m_all_stats_white = reshape(m_all_stats_white, length(m_all_stats_white), 1)
-            end
-
-            na = NamedArray(m_all_stats_white)
-            setnames!(na, encapsulate_string(string.(StatsBase.coefnames(lr.updformula.rhs))), 1)
-            setnames!(na, encapsulate_string(string.(all_white_stats_name)), 2)
-            setdimnames!(na, ("Terms", "Stats"))
-            my_namedarray_print(io, na)
+            helper_print_table(io, "White's covariance estimator ($(Base.Unicode.uppercase(string(cur_type)))):", 
+                [lr.coefs, lr.white_stderrors[cur_i], lr.white_t_values[cur_i], lr.white_p_values[cur_i], lr.white_ci_low[cur_i], lr.white_ci_up[cur_i] ],
+                ["Coefs", "Std err", "t", "Pr(>|t|)", "low ci", "high ci"], 
+                lr.updformula)
         end
     end
 
     if length(lr.hac_types) > 0
         for (cur_i, cur_type) in enumerate(lr.hac_types)
-            println(io, "\n\nNewey-West's covariance estimator:")
-            all_hac_stats = [lr.coefs, lr.hac_stderrors[cur_i], lr.hac_t_values[cur_i], lr.hac_p_values[cur_i], lr.hac_ci_low[cur_i], lr.hac_ci_up[cur_i] ]
-            all_hac_stats_name = ["Coefs", "Std err", "t", "Pr(>|t|)", "low ci", "high ci" ]
-            todelete = [i for (i, v) in enumerate(all_hac_stats) if isnothing(v)]
-            deleteat!(all_hac_stats, todelete)
-            deleteat!(all_hac_stats_name, todelete)
-            m_all_stats_hac = reduce(hcat, all_hac_stats)
-            if m_all_stats_hac isa Vector
-                m_all_stats_hac = reshape(m_all_stats_hac, length(m_all_stats_hac), 1)
-            end
-            na = NamedArray(m_all_stats_hac)
-            setnames!(na, encapsulate_string(string.(StatsBase.coefnames(lr.updformula.rhs))), 1)
-            setnames!(na, encapsulate_string(string.(all_hac_stats_name)), 2)
-            setdimnames!(na, ("Terms", "Stats"))
-            my_namedarray_print(io, na)
+            helper_print_table(io, "Newey-West's covariance estimator:", 
+                [lr.coefs, lr.hac_stderrors[cur_i], lr.hac_t_values[cur_i], lr.hac_p_values[cur_i], lr.hac_ci_low[cur_i], lr.hac_ci_up[cur_i] ],
+                ["Coefs", "Std err", "t", "Pr(>|t|)", "low ci", "high ci"], 
+                lr.updformula)
         end
     end
 end
@@ -500,11 +461,17 @@ function predict_and_stats(lr::linRegRes, df::DataFrames.DataFrame; α=0.05, req
         if isnothing(lr.σ̂²)
             throw(ArgumentError(":stdp requires that the σ̂² (:sigma) was previously calculated through the regression"))
         end
+        if length(lr.white_types) + length(lr.hac_types) > 0
+            println(io, "The STDP statistic that relies on Sigma^2 has been requested. At least one robust covariance have been requested indicating that the assumptions needed for Sigma^2 may not be present.")
+        end
         needed_stats[:stdp] = sqrt.(needed_stats[:leverage] .* lr.σ̂²)
     end
     if :stdi in needed
         if isnothing(lr.σ̂²)
             throw(ArgumentError(":stdi requires that the σ̂² (:sigma) was previously calculated through the regression"))
+        end
+        if length(lr.white_types) + length(lr.hac_types) > 0
+            println(io, "The STDI statistic that relies on Sigma^2 has been requested. At least one robust covariance have been requested indicating that the assumptions needed for Sigma^2 may not be present.")
         end
         needed_stats[:stdi] = sqrt.((1. .+ needed_stats[:leverage]) .* lr.σ̂²)
     end
@@ -512,33 +479,54 @@ function predict_and_stats(lr::linRegRes, df::DataFrames.DataFrame; α=0.05, req
         if isnothing(lr.σ̂²)
             throw(ArgumentError(":stdr requires that the σ̂² (:sigma) was previously calculated through the regression"))
         end
+        if length(lr.white_types) + length(lr.hac_types) > 0
+            println(io, "The STDR statistic that relies on Sigma^2 has been requested. At least one robust covariance have been requested indicating that the assumptions needed for Sigma^2 may not be present.")
+        end
         needed_stats[:stdr] = sqrt.((1. .- needed_stats[:leverage]) .* lr.σ̂²)
     end
     if :student in needed
+        if length(lr.white_types) + length(lr.hac_types) > 0
+            println(io, "The student statistic that relies on Sigma^2 has been requested. At least one robust covariance have been requested indicating that the assumptions needed for Sigma^2 may not be present.")
+        end
         needed_stats[:student] = needed_stats[:residuals] ./ needed_stats[:stdr]
     end
     if :rstudent in needed
+        if length(lr.white_types) + length(lr.hac_types) > 0
+            println(io, "The rstudent statistic that relies on Sigma^2 has been requested. At least one robust covariance have been requested indicating that the assumptions needed for Sigma^2 may not be present.")
+        end
         needed_stats[:rstudent] = needed_stats[:student] .* real.(sqrt.(complex.((n .- p .- 1 ) ./ (n .- p .- needed_stats[:student].^2 ), 0)))
     end
     if :lcli in needed
+        if length(lr.white_types) + length(lr.hac_types) > 0
+            println(io, "The LCLI statistic that relies on Sigma^2 has been requested. At least one robust covariance have been requested indicating that the assumptions needed for Sigma^2 may not be present.")
+        end
         needed_stats[:lcli] = needed_stats[:predicted] .- (lr.t_statistic .* needed_stats[:stdi])
     end
     if :ucli in needed
+        if length(lr.white_types) + length(lr.hac_types) > 0
+            println(io, "The UCLI statistic that relies on Sigma^2 has been requested. At least one robust covariance have been requested indicating that the assumptions needed for Sigma^2 may not be present.")
+        end
         needed_stats[:ucli] = needed_stats[:predicted] .+ (lr.t_statistic .* needed_stats[:stdi])
     end
     if :lclp in needed
+        if length(lr.white_types) + length(lr.hac_types) > 0
+            println(io, "The LCLP statistic that relies on Sigma^2 has been requested. At least one robust covariance have been requested indicating that the assumptions needed for Sigma^2 may not be present.")
+        end
         needed_stats[:lclp] = needed_stats[:predicted] .- (lr.t_statistic .* needed_stats[:stdp])
     end
     if :uclp in needed
-        needed_stats[:uclp] = needed_stats[:predicted] .+ (lr.t_statistic .* needed_stats[:stdp])
-    end
-    if :uclp in needed
+        if length(lr.white_types) + length(lr.hac_types) > 0
+            println(io, "The UCLP statistic that relies on Sigma^2 has been requested. At least one robust covariance have been requested indicating that the assumptions needed for Sigma^2 may not be present.")
+        end
         needed_stats[:uclp] = needed_stats[:predicted] .+ (lr.t_statistic .* needed_stats[:stdp])
     end
     if :press in needed
         needed_stats[:press] = needed_stats[:residuals] ./ (1. .- needed_stats[:leverage])
     end
     if :cooksd in needed
+        if length(lr.white_types) + length(lr.hac_types) > 0
+            println(io, "The CooksD statistic that relies on Sigma^2 has been requested. At least one robust covariance have been requested indicating that the assumptions needed for Sigma^2 may not be present.")
+        end
         needed_stats[:cooksd] = needed_stats[:stdp].^2 ./  needed_stats[:stdr].^2 .* needed_stats[:student].^2 .* (1 / lr.p)
     end
 
@@ -548,7 +536,5 @@ end
 
     return copieddf
 end
-
-
 
 end # end of module definition

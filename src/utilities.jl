@@ -250,6 +250,28 @@ using NamedArrays
 function my_namedarray_print(io::IO, n::NamedArray)
     tmpio = IOBuffer()
     show(tmpio, n)
-    print(io, split(String(take!(tmpio)), "\n", limit=2)[2])
+    println(io, split(String(take!(tmpio)), "\n", limit=2)[2])
 end
+
+"""
+    function helper_print_table(io, title, stats::Vector, stats_name::Vector, updformula)
+
+    (Internal) Convenience function to display a table of statistics to the user.
+"""
+function helper_print_table(io::IO, title, stats::Vector, stats_name::Vector, updformula)
+    println(io, "\n$title")
+    todelete = [i for (i, v) in enumerate(stats) if isnothing(v)]
+    deleteat!(stats, todelete)
+    deleteat!(stats_name, todelete)
+    m_all_stats = reduce(hcat, stats)
+    if m_all_stats isa Vector
+        m_all_stats = reshape(m_all_stats, length(m_all_stats), 1)
+    end
+    na = NamedArray(m_all_stats)
+    setnames!(na, encapsulate_string(string.(StatsBase.coefnames(updformula.rhs))), 1)
+    setnames!(na, encapsulate_string(string.(stats_name)), 2)
+    setdimnames!(na, ("Terms", "Stats"))
+    my_namedarray_print(io, na)
+end
+
 
