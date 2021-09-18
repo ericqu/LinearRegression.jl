@@ -5,6 +5,10 @@ include("../src/utilities.jl")
     needed = ([:white], [:nw])
     @test needed == get_needed_robust_cov_stats(wanted)
 
+    wanted = [:hc0, :hc1, :nw]
+    needed = ([:hc0, :hc1], [:nw])
+    @test needed == get_needed_robust_cov_stats(wanted)
+
     wanted = ["White", "HC0" , "nw" , "nothing"]
     needed = ([:white, :hc0], [:nw])
     @test needed == get_needed_robust_cov_stats(wanted)

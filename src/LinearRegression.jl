@@ -289,7 +289,7 @@ function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame; α::Float
             if t in white_types
                 continue
             end
-            cur_type, cur_std = heteroscedasticity(t, x, y, coefs, intercept, n, p)
+            cur_type, cur_std = heteroscedasticity(t, x, y, coefs, intercept, n, p, xytxy)
             push!(white_types, cur_type)
             push!(white_stds, cur_std)
 
@@ -395,34 +395,37 @@ end
     (Internal) Compute the standard errors modified for the White's covariance estimator.
     Currently support HC0, HC1, HC2 and HC3. When :white is passed, select HC3 when the number of observation is below 250 otherwise select HC0.
 """
-function heteroscedasticity(t::Symbol, x, y, coefs, intercept, n, p)
+function heteroscedasticity(t::Symbol, x, y, coefs, intercept, n, p, xytxy)
     inv_xtx = inv(x' * x)
+    XX = @view(xytxy[1:end - 1, 1:end - 1])
     e = y - lr_predict(x, coefs, intercept)
+    xe = x .* e
 
     if t == :white && n < 250  
-            t = :hc3
+        t = :hc3
+    elseif t == :white && n >= 250
+        t = :hc0
     end
 
     if t == :hc0
-        xe = x .* e
-        xetxe = xe' * xe    
-        return (:hc0, sqrt.(diag(inv_xtx * xetxe * inv_xtx)))
+        xetxe = xe' * xe
+        return (:hc0, sqrt.(diag(XX * xetxe * XX)))
     elseif t == :hc1
-        xe = x .* e
-        xetxe = xe' * xe    
-        return (:hc1, (n / (n - p)) .* sqrt.(diag(inv_xtx * xetxe * inv_xtx)))
+        scale = (n / (n - p))
+        xetxe = xe' * xe
+        return (:hc1, sqrt.(diag(XX * xetxe * XX .* scale)))
     elseif t == :hc2
         leverage = diag(x * inv(x'x) * x')
-        e = @.( e / (1. - leverage))
-        xe = x .* e
+        scale = @.( 1. / (1. - leverage))
+        xe = @.(xe .* real(sqrt(Complex(scale))))
         xetxe = xe' * xe
-        return (:hc2, sqrt.(diag(inv_xtx * xetxe * inv_xtx)))
+        return (t, sqrt.(diag(inv_xtx * xetxe * inv_xtx)))
     elseif t == :hc3
         leverage = diag(x * inv(x'x) * x')
-        e = @.( e / ((1. - leverage)^2) )
-        xe = x .* e
+        scale = @.( 1. / (1. - leverage)^2)
+        xe = @.(xe .* real(sqrt(Complex(scale))))
         xetxe = xe' * xe
-        return (:hc3, sqrt.(diag(inv_xtx * xetxe * inv_xtx)))
+        return (t, sqrt.(diag(inv_xtx * xetxe * inv_xtx)))
     else
         throw(error("Unknown symbol ($(t)) used as the White's covariance estimator"))
     end
