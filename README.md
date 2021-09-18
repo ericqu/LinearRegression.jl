@@ -51,10 +51,11 @@ LinearRegression relies on the Sweep operator to estimate the coefficients, and 
 
 The Akaike information criterion (AIC) is calculated with the formula relevant only for Linear Regression hence enabling comparison between linear regressions (AIC=n log(SSE / n) + 2p; where SSE is the Sum of Squared Errors and p is the number of predictors). On the other hand, the AIC calculated with GLM is more general (based on log-likelihood), enabling comparison between a broader range of models.
 
+Linear Regression provide access to some robust covariance estimators (for Heteroscedasticity: White, HC0, HC1, HC2 and HC3 and for HAC: Newey-West)
+
 # List of Statistics 
 ## List of Statistics calculated about the linear regression model:
 - AIC: Akaike information criterion with the formula AIC=n log(SSE / n) + 2p; where SSE is the Sum of Squared Errors and p is the number of predictors.
-- P values for each predictor.
 - SSE Sum of Squared Errors as the output from the sweep operator.
 - SST as the Total Sum of Squares as the sum over all squared differences between the observations and their overall mean.
 - R² as 1 - SSE/SST.
@@ -65,8 +66,9 @@ The Akaike information criterion (AIC) is calculated with the formula relevant o
 - The t-statistic.
 - The mean squared error.
 - The root of the mean squared error.
-- The standard errors.
-- The t values.
+- The standard errors and their equivalent with a Heteroscedasticity or HAC covariance estimator
+- The t values and their equivalent with a Heteroscedasticity or HAC covariance estimator
+- P values for each predictor and their equivalent with a Heteroscedasticity or HAC covariance estimator
 
 ## List of Statistics about the predicted values:
 - The predicted values
@@ -93,7 +95,7 @@ Please post your questions, feedabck or issues in the Issues tabs. As much as po
 - https://blogs.sas.com/content/iml/2021/07/14/performance-ls-regression.html
 - https://github.com/joshday/SweepOperator.jl
 - http://hua-zhou.github.io/teaching/biostatm280-2019spring/slides/12-sweep/sweep.html
-
+- https://github.com/mcreel/Econometrics for the Newey-West implementation
 
 # Example
 

@@ -1,9 +1,12 @@
 module LinearRegression
 
+using NamedArrays:length
+using LinearAlgebra:length
+using Distributions:length
 export regress, predict_and_stats
 
 using Base: Tuple, Int64
-using StatsBase:eltype, isapprox, length, coefnames
+using StatsBase:eltype, isapprox, length, coefnames, push!
 using Distributions
 using Printf, NamedArrays
 using StatsBase
@@ -11,12 +14,19 @@ using StatsModels, DataFrames
 
 include("sweep_operator.jl")
 include("utilities.jl")
+include("newey_west.jl")
 
 struct linRegRes 
     extended_inverse::Matrix                # Store the extended inverse matrix 
     coefs::Union{Nothing,Vector}            # Store the coefficients of the fitted model
+    white_types::Union{Nothing,Vector}      # Store the type of White's covariance estimator(s) used
+    hac_types::Union{Nothing,Vector}        # Store the type of White's covariance estimator(s) used
     stderrors::Union{Nothing,Vector}        # Store the standard errors for the fitted model
+    white_stderrors::Union{Nothing,Vector}  # Store the standard errors modified for the White's covariance estimator
+    hac_stderrors::Union{Nothing,Vector}    # Store the standard errors modified for the Newey-West covariance estimator
     t_values::Union{Nothing,Vector}         # Store the t values for the fitted model
+    white_t_values::Union{Nothing,Vector}   # Store the t values modified for the White's covariance estimator
+    hac_t_values::Union{Nothing,Vector}     # Store the t values modified for the Newey-West covariance estimator
     p::Int64                                # Store the number of parameters (including the intercept as a parameter)
     MSE::Union{Nothing,Float64}             # Store the Mean squared error for the fitted model
     intercept::Bool                         # Indicate if the model has an intercept
@@ -26,8 +36,14 @@ struct linRegRes
     AIC::Union{Nothing,Float64}             # Store the Akaike information criterion for the fitted model
     σ̂²::Union{Nothing,Float64}              # Store the σ̂² for the fitted model
     p_values::Union{Nothing,Vector}         # Store the p values for the fitted model
+    white_p_values::Union{Nothing,Vector}   # Store the p values modified for the White's covariance estimator
+    hac_p_values::Union{Nothing,Vector}     # Store the p values modified for the Newey-West covariance estimator
     ci_up::Union{Nothing,Vector}            # Store the upper values confidence interval of the coefficients 
     ci_low::Union{Nothing,Vector}           # Store the lower values confidence interval of the coefficients 
+    white_ci_up::Union{Nothing,Vector}      # Store the upper values confidence interval of the coefficients for White covariance estimators 
+    white_ci_low::Union{Nothing,Vector}     # Store the upper values confidence interval of the coefficients for White covariance estimators 
+    hac_ci_up::Union{Nothing,Vector}        # Store the upper values confidence interval of the coefficients for Newey-West covariance estimators
+    hac_ci_low::Union{Nothing,Vector}       # Store the upper values confidence interval of the coefficients for Newey-West covariance estimators
     observations                            # Store the number of observations used in the model
     t_statistic::Union{Nothing,Float64}     # Store the t statistic
     VIF::Union{Nothing,Vector}              # Store the Varince inflation factor
@@ -59,50 +75,80 @@ function Base.show(io::IO, lr::linRegRes)
         @printf(io, "  MSE: %g\n", lr.MSE)
     end
 
-    if !isnothing(lr.σ̂²) && !isnothing(lr.AIC)
-        @printf(io, "  σ̂²: %g\t\t\tAIC: %g\n", lr.σ̂², lr.AIC)
-    elseif !isnothing(lr.σ̂²)
-        @printf(io, "  σ̂²: %g\n", lr.σ̂²)
-    elseif !isnothing(lr.AIC)
-        @printf(io, "  AIC: %g\n", lr.AIC)
+    if length(lr.white_types) + length(lr.hac_types) == 0
+        if !isnothing(lr.σ̂²) && !isnothing(lr.AIC)
+            @printf(io, "  σ̂²: %g\t\t\tAIC: %g\n", lr.σ̂², lr.AIC)
+        elseif !isnothing(lr.σ̂²)
+            @printf(io, "  σ̂²: %g\n", lr.σ̂²)
+        elseif !isnothing(lr.AIC)
+            @printf(io, "  AIC: %g\n", lr.AIC)
+        end
     end
     
     if !isnothing(lr.ci_low) || !isnothing(lr.ci_up)
-        @printf(io, "Confidence interval: %g%%\n", (1 - lr.alpha)*100 )
+        @printf(io, "Confidence interval: %g%%\n", (1 - lr.alpha) * 100 )
     end
 
-    all_stats = [lr.coefs, lr.stderrors, lr.t_values, lr.p_values, lr.ci_low, lr.ci_up, lr.VIF]
-    all_stats_name = ["Coefs", "Std err", "t", "Pr(>|t|)", "low ci", "high ci", "VIF"]
+    if length(lr.white_types) + length(lr.hac_types) == 0
+        helper_print_table(io, "Coefficients statistics:", 
+            [lr.coefs, lr.stderrors, lr.t_values, lr.p_values, lr.ci_low, lr.ci_up, lr.VIF],
+            ["Coefs", "Std err", "t", "Pr(>|t|)", "low ci", "high ci", "VIF"], 
+            lr.updformula)
+    end
 
-    todelete = [i for (i, v) in enumerate(all_stats) if isnothing(v)]
-    deleteat!(all_stats, todelete)
-    deleteat!(all_stats_name, todelete)
-    println(io, "Coefficients statistics:")
-    na = NamedArray(reduce(hcat, all_stats))
-    setnames!(na, encapsulate_string(string.(StatsBase.coefnames(lr.updformula.rhs))), 1 )
-    setnames!(na, encapsulate_string(string.(all_stats_name)), 2 )
-    setdimnames!(na, ("Terms", "Stats"))
-    my_namedarray_print(io, na)
+    if length(lr.white_types) > 0
+        for (cur_i, cur_type) in enumerate(lr.white_types)
+            helper_print_table(io, "White's covariance estimator ($(Base.Unicode.uppercase(string(cur_type)))):", 
+                [lr.coefs, lr.white_stderrors[cur_i], lr.white_t_values[cur_i], lr.white_p_values[cur_i], lr.white_ci_low[cur_i], lr.white_ci_up[cur_i] ],
+                ["Coefs", "Std err", "t", "Pr(>|t|)", "low ci", "high ci"], 
+                lr.updformula)
+        end
+    end
+
+    if length(lr.hac_types) > 0
+        for (cur_i, cur_type) in enumerate(lr.hac_types)
+            helper_print_table(io, "Newey-West's covariance estimator:", 
+                [lr.coefs, lr.hac_stderrors[cur_i], lr.hac_t_values[cur_i], lr.hac_p_values[cur_i], lr.hac_ci_low[cur_i], lr.hac_ci_up[cur_i] ],
+                ["Coefs", "Std err", "t", "Pr(>|t|)", "low ci", "high ci"], 
+                lr.updformula)
+        end
+    end
 end
 
 """
-    function getVIF(x, intercept, p)
+    function getVIF(x, intercept, updf, df, p)
 
     (internal) Calculates the VIF, Variance Inflation Factor, for a given regression.
+    When the has an intercept use the simplified formula. When there is no intercept use the classical formula.
 """
-function getVIF(x, intercept, p)
+function getVIF(x, intercept, updf, df, p)
     if intercept
+        if p == 1
+            return [0., 1]
+        end
         return vcat(0, diag(inv(cor(@view(x[:, 2:end])))))
+    else 
+        if p == 1
+            return [0]
+        end
+        vt = Symbol.(StatsBase.coefnames(updf.rhs))
+        results = Vector{Float64}(undef, length(vt))
+        for (i, ct) in enumerate(vt)
+            tf = Term(ct) ~ term(0) + sum(term.(setdiff(vt, [ct])))
+            cr = regress(tf, df, req_stats=[:r2])
+            results[i] = 1. / (1. - cr.R2)
+        end
+        return results
     end
-    return diag(inv(cor(x)))
+# return diag(inv(cor(x)))
 end
 
 """
     function getSST(y, intercept)
 
     (internal) Calculates "total sum of squares" see link for description.
-    TODO: to confirm calculation when there is no intercept.
     https://en.wikipedia.org/wiki/Total_sum_of_squares
+    When the mode has no intercept the SST becomes the sum of squares of y
 """
 function getSST(y, intercept)
     SST = zero(eltype(y))
@@ -112,7 +158,7 @@ function getSST(y, intercept)
     else 
         SST = sum(abs2.(y))
     end
-    
+
     return SST
 end
 
@@ -129,28 +175,27 @@ function lr_predict(xs, coefs, intercept::Bool)
     end
 end
 
-
 """
-    function hasintercept!(f::StatsModels.FormulaTerm)
-    (internal) return true when the formula has an intercept term.
+    function hasintercept(f::StatsModels.FormulaTerm)
+    (internal) return a tuple with the first item being true when the formula has an intercept term, the second item being the potentially updated formula.
     If there is no intercept indicated add one.
-    IF the intercept is specified as absent (y ~ 0 + x) then do not change.
+    If the intercept is specified as absent (y ~ 0 + x) then do not change.
 """
-function hasintercept!(f::StatsModels.FormulaTerm)
+function hasintercept(f::StatsModels.FormulaTerm)
     intercept = true
     if f.rhs isa ConstantTerm{Int64}
         intercept = convert(Bool, f.rhs.n)
-        return intercept
+        return intercept, f
     elseif f.rhs isa Tuple
         for t in f.rhs
             if t isa ConstantTerm{Int64}
                 intercept = convert(Bool, t.n)
-                return intercept
+                return intercept, f
             end
         end
     end
     f = FormulaTerm(f.lhs, InterceptTerm{true}() + f.rhs)
-    return intercept
+    return intercept, f
 end
 
 """
@@ -158,8 +203,8 @@ end
 
     Estimate the coefficients of the regression, given a dataset and a formula. 
 """
-function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame; α::Float64=0.05, req_stats=["all"], remove_missing=false)
-    intercept = hasintercept!(f)
+function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame; α::Float64=0.05, req_stats=["all"], remove_missing=false, cov=[:none])
+    intercept, f= hasintercept(f)
 
     (α > 0. && α < 1.) || throw(ArgumentError("α must be between 0 and 1"))
 
@@ -180,19 +225,19 @@ function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame; α::Float
 
     xytxy = xy' * xy
 
-    # mandatory stats
+# mandatory stats
     sse = sweep_op_full!(xytxy)[end]
     coefs = xytxy[1:p, end]
     mse = xytxy[p + 1, p + 1] / (n - p)
 
-    # optional stats
+# optional stats
     total_scalar_stats = Set([:sse, :mse, :sst, :r2, :adjr2, :rmse, :aic, :sigma, :t_statistic, :vif])
     total_vector_stats = Set([:coefs, :stderror, :t_values, :p_values, :ci])
 
     scalar_stats = Dict{Symbol,Union{Nothing,Float64}}(intersect(total_scalar_stats, needed_stats) .=> nothing)
     vector_stats = Dict{Symbol,Union{Nothing,Vector}}(intersect(total_vector_stats, needed_stats) .=> nothing)
 
-    # optional stats
+# optional stats
     if :sst in needed_stats
         scalar_stats[:sst] = getSST(y, intercept)
     end
@@ -227,17 +272,164 @@ function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame; α::Float
         vector_stats[:ci] = vector_stats[:stderror] * scalar_stats[:t_statistic]
     end
     if :vif in needed_stats
-        vector_stats[:vif] = getVIF(x, intercept, p)
+        vector_stats[:vif] = getVIF(x, intercept, updatedformula, copieddf, p)
     end
 
-    sres = linRegRes(xytxy, coefs, get(vector_stats, :stderror, nothing), get(vector_stats, :t_values, nothing), p, mse, intercept, get(scalar_stats, :r2, nothing),
-                get(scalar_stats, :adjr2, nothing), get(scalar_stats, :rmse, nothing), get(scalar_stats, :aic, nothing), get(scalar_stats, :sigma, nothing),
-                get(vector_stats, :p_values, nothing), 
-                haskey(vector_stats, :ci) ? coefs .+ vector_stats[:ci] : nothing, 
-                haskey(vector_stats, :ci) ? coefs .- vector_stats[:ci] : nothing, 
-                n, get(scalar_stats, :t_statistic, nothing), get(vector_stats, :vif, nothing), f, dataschema, updatedformula, α)
+# robust estimators stats
+    needed_white, needed_hac = get_needed_robust_cov_stats(cov)
+    white_types = Vector{Symbol}()
+    white_stds = Vector{Vector}()
+    white_t_vals = Vector{Vector}()
+    white_p_vals = Vector{Vector}()
+    white_ci_up = Vector{Vector}()
+    white_ci_low = Vector{Vector}()
 
+    if length(needed_white) > 0
+        for t in needed_white
+            if t in white_types
+                continue
+            end
+            cur_type, cur_std = heteroscedasticity(t, x, y, coefs, intercept, n, p, xytxy)
+            push!(white_types, cur_type)
+            push!(white_stds, cur_std)
+
+            if !isnothing(get(vector_stats, :t_values, nothing))
+                cur_t_vals = coefs ./ cur_std
+                push!(white_t_vals, cur_t_vals)
+            else 
+                white_t_vals = nothing
+            end
+
+            if !isnothing(get(vector_stats, :p_values, nothing))
+                cur_p_vals = ccdf.(Ref(FDist(1., (n - p))), abs2.(cur_t_vals))
+                push!(white_p_vals, cur_p_vals)
+            else
+                white_p_vals = nothing
+            end
+            if !isnothing(get(vector_stats, :ci, nothing))
+                cur_ci = cur_std * scalar_stats[:t_statistic]
+                cur_ci_up = coefs .+ cur_ci
+                cur_ci_low = coefs .- cur_ci
+                push!(white_ci_up, cur_ci_up)
+                push!(white_ci_low, cur_ci_low)
+            else 
+                white_ci_up = nothing
+                white_ci_low = nothing
+            end
+        end
+    end
+
+    hac_types = Vector{Symbol}()
+    hac_stds = Vector{Vector}()
+    hac_t_vals = Vector{Vector}()
+    hac_p_vals = Vector{Vector}()
+    hac_ci_up = Vector{Vector}()
+    hac_ci_low = Vector{Vector}()
+
+    if length(needed_hac) > 0
+        for t in needed_hac
+            if t in hac_types
+                continue
+            end
+            cur_type, cur_std = HAC(t, x, y, coefs, intercept, n, p)
+            push!(hac_types, cur_type)
+            push!(hac_stds, cur_std)
+
+            if !isnothing(get(vector_stats, :t_values, nothing))
+                cur_t_vals = coefs ./ cur_std
+                push!(hac_t_vals, cur_t_vals)
+            else
+                hac_t_vals = nothing
+            end
+            if !isnothing(get(vector_stats, :p_values, nothing))
+                cur_p_vals = ccdf.(Ref(FDist(1., (n - p))), abs2.(cur_t_vals))
+                push!(hac_p_vals, cur_p_vals)
+            else
+                hac_p_vals = nothing
+            end
+            if !isnothing(get(vector_stats, :ci, nothing))
+                cur_ci = cur_std * scalar_stats[:t_statistic]
+                cur_ci_up = coefs .+ cur_ci
+                cur_ci_low = coefs .- cur_ci
+                push!(hac_ci_up, cur_ci_up)
+                push!(hac_ci_low, cur_ci_low)
+            else
+                hac_ci_up = nothing
+                hac_ci_low = nothing
+            end
+        end
+    end
+
+    sres = linRegRes(xytxy, coefs, 
+        white_types, hac_types,
+        get(vector_stats, :stderror, nothing), white_stds, hac_stds, 
+        get(vector_stats, :t_values, nothing), white_t_vals, hac_t_vals,
+        p, mse, intercept, get(scalar_stats, :r2, nothing),
+        get(scalar_stats, :adjr2, nothing), get(scalar_stats, :rmse, nothing), get(scalar_stats, :aic, nothing), get(scalar_stats, :sigma, nothing),
+        get(vector_stats, :p_values, nothing), white_p_vals, hac_p_vals,
+        haskey(vector_stats, :ci) ? coefs .+ vector_stats[:ci] : nothing, 
+        haskey(vector_stats, :ci) ? coefs .- vector_stats[:ci] : nothing, 
+        white_ci_up, white_ci_low,
+        hac_ci_up, hac_ci_low,
+        n, get(scalar_stats, :t_statistic, nothing), get(vector_stats, :vif, nothing), f, dataschema, updatedformula, α)
+    
     return sres
+end
+
+"""
+    function HAC(t::Symbol, x, y, coefs, intercept, n, p)
+
+    (Internal) Return the relevant HAC (heteroskedasticity and autocorrelation consistent) estimator.
+    In the current version only Newey-West is implemented.
+"""
+function HAC(t::Symbol, x, y, coefs, intercept, n, p)
+    inv_xtx = inv(x' * x)
+        e = y - lr_predict(x, coefs, intercept)
+    xe = x .* e
+    return (t, sqrt.(diag(n * inv_xtx * newey_west(xe) * inv_xtx)))
+end
+
+"""
+    function heteroscedasticity(t::Symbol, x, y, coefs, intercept, n, p)
+
+    (Internal) Compute the standard errors modified for the White's covariance estimator.
+    Currently support HC0, HC1, HC2 and HC3. When :white is passed, select HC3 when the number of observation is below 250 otherwise select HC0.
+"""
+function heteroscedasticity(t::Symbol, x, y, coefs, intercept, n, p, xytxy)
+    inv_xtx = inv(x' * x)
+    XX = @view(xytxy[1:end - 1, 1:end - 1])
+    e = y - lr_predict(x, coefs, intercept)
+    xe = x .* e
+
+    if t == :white && n < 250  
+        t = :hc3
+    elseif t == :white && n >= 250
+        t = :hc0
+    end
+
+    if t == :hc0
+        xetxe = xe' * xe
+        return (:hc0, sqrt.(diag(XX * xetxe * XX)))
+    elseif t == :hc1
+        scale = (n / (n - p))
+        xetxe = xe' * xe
+        return (:hc1, sqrt.(diag(XX * xetxe * XX .* scale)))
+    elseif t == :hc2
+        leverage = diag(x * inv(x'x) * x')
+        scale = @.( 1. / (1. - leverage))
+        xe = @.(xe .* real(sqrt(Complex(scale))))
+        xetxe = xe' * xe
+        return (t, sqrt.(diag(inv_xtx * xetxe * inv_xtx)))
+    elseif t == :hc3
+        leverage = diag(x * inv(x'x) * x')
+        scale = @.( 1. / (1. - leverage)^2)
+        xe = @.(xe .* real(sqrt(Complex(scale))))
+        xetxe = xe' * xe
+        return (t, sqrt.(diag(inv_xtx * xetxe * inv_xtx)))
+    else
+        throw(error("Unknown symbol ($(t)) used as the White's covariance estimator"))
+    end
+
 end
 
 """
@@ -272,45 +464,72 @@ function predict_and_stats(lr::linRegRes, df::DataFrames.DataFrame; α=0.05, req
         if isnothing(lr.σ̂²)
             throw(ArgumentError(":stdp requires that the σ̂² (:sigma) was previously calculated through the regression"))
         end
+        if length(lr.white_types) + length(lr.hac_types) > 0
+            println(io, "The STDP statistic that relies on Sigma^2 has been requested. At least one robust covariance have been requested indicating that the assumptions needed for Sigma^2 may not be present.")
+        end
         needed_stats[:stdp] = sqrt.(needed_stats[:leverage] .* lr.σ̂²)
     end
     if :stdi in needed
         if isnothing(lr.σ̂²)
             throw(ArgumentError(":stdi requires that the σ̂² (:sigma) was previously calculated through the regression"))
         end
+        if length(lr.white_types) + length(lr.hac_types) > 0
+            println(io, "The STDI statistic that relies on Sigma^2 has been requested. At least one robust covariance have been requested indicating that the assumptions needed for Sigma^2 may not be present.")
+        end
         needed_stats[:stdi] = sqrt.((1. .+ needed_stats[:leverage]) .* lr.σ̂²)
     end
     if :stdr in needed
         if isnothing(lr.σ̂²)
-            throw(ArgumentError(":stdi requires that the σ̂² (:sigma) was previously calculated through the regression"))
+            throw(ArgumentError(":stdr requires that the σ̂² (:sigma) was previously calculated through the regression"))
+        end
+        if length(lr.white_types) + length(lr.hac_types) > 0
+            println(io, "The STDR statistic that relies on Sigma^2 has been requested. At least one robust covariance have been requested indicating that the assumptions needed for Sigma^2 may not be present.")
         end
         needed_stats[:stdr] = sqrt.((1. .- needed_stats[:leverage]) .* lr.σ̂²)
     end
     if :student in needed
+        if length(lr.white_types) + length(lr.hac_types) > 0
+            println(io, "The student statistic that relies on Sigma^2 has been requested. At least one robust covariance have been requested indicating that the assumptions needed for Sigma^2 may not be present.")
+        end
         needed_stats[:student] = needed_stats[:residuals] ./ needed_stats[:stdr]
     end
     if :rstudent in needed
+        if length(lr.white_types) + length(lr.hac_types) > 0
+            println(io, "The rstudent statistic that relies on Sigma^2 has been requested. At least one robust covariance have been requested indicating that the assumptions needed for Sigma^2 may not be present.")
+        end
         needed_stats[:rstudent] = needed_stats[:student] .* real.(sqrt.(complex.((n .- p .- 1 ) ./ (n .- p .- needed_stats[:student].^2 ), 0)))
     end
     if :lcli in needed
+        if length(lr.white_types) + length(lr.hac_types) > 0
+            println(io, "The LCLI statistic that relies on Sigma^2 has been requested. At least one robust covariance have been requested indicating that the assumptions needed for Sigma^2 may not be present.")
+        end
         needed_stats[:lcli] = needed_stats[:predicted] .- (lr.t_statistic .* needed_stats[:stdi])
     end
     if :ucli in needed
+        if length(lr.white_types) + length(lr.hac_types) > 0
+            println(io, "The UCLI statistic that relies on Sigma^2 has been requested. At least one robust covariance have been requested indicating that the assumptions needed for Sigma^2 may not be present.")
+        end
         needed_stats[:ucli] = needed_stats[:predicted] .+ (lr.t_statistic .* needed_stats[:stdi])
     end
     if :lclp in needed
+        if length(lr.white_types) + length(lr.hac_types) > 0
+            println(io, "The LCLP statistic that relies on Sigma^2 has been requested. At least one robust covariance have been requested indicating that the assumptions needed for Sigma^2 may not be present.")
+        end
         needed_stats[:lclp] = needed_stats[:predicted] .- (lr.t_statistic .* needed_stats[:stdp])
     end
     if :uclp in needed
-        needed_stats[:uclp] = needed_stats[:predicted] .+ (lr.t_statistic .* needed_stats[:stdp])
-    end
-    if :uclp in needed
+        if length(lr.white_types) + length(lr.hac_types) > 0
+            println(io, "The UCLP statistic that relies on Sigma^2 has been requested. At least one robust covariance have been requested indicating that the assumptions needed for Sigma^2 may not be present.")
+        end
         needed_stats[:uclp] = needed_stats[:predicted] .+ (lr.t_statistic .* needed_stats[:stdp])
     end
     if :press in needed
         needed_stats[:press] = needed_stats[:residuals] ./ (1. .- needed_stats[:leverage])
     end
     if :cooksd in needed
+        if length(lr.white_types) + length(lr.hac_types) > 0
+            println(io, "The CooksD statistic that relies on Sigma^2 has been requested. At least one robust covariance have been requested indicating that the assumptions needed for Sigma^2 may not be present.")
+        end
         needed_stats[:cooksd] = needed_stats[:stdp].^2 ./  needed_stats[:stdr].^2 .* needed_stats[:student].^2 .* (1 / lr.p)
     end
 
@@ -320,7 +539,5 @@ end
 
     return copieddf
 end
-
-
 
 end # end of module definition

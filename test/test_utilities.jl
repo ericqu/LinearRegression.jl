@@ -1,5 +1,48 @@
 include("../src/utilities.jl")
 
+@testset "Covariance estimator stats massaging" begin
+    wanted = [:white, :white , :bogus , :nw]
+    needed = ([:white], [:nw])
+    @test needed == get_needed_robust_cov_stats(wanted)
+
+    wanted = [:hc0, :hc1, :nw]
+    needed = ([:hc0, :hc1], [:nw])
+    @test needed == get_needed_robust_cov_stats(wanted)
+
+    wanted = ["White", "HC0" , "nw" , "nothing"]
+    needed = ([:white, :hc0], [:nw])
+    @test needed == get_needed_robust_cov_stats(wanted)
+
+    wanted = ["Hc1", "HC0" , "nothing"]
+    needed = ([:hc0 , :hc1], [])
+    @test needed == get_needed_robust_cov_stats(wanted)
+
+    wanted = "Nw"
+    needed = ([], [:nw])
+    @test needed == get_needed_robust_cov_stats(wanted)
+
+    wanted = :hc0
+    needed = ([:hc0], [])
+    @test needed == get_needed_robust_cov_stats(wanted)
+
+    wanted = :hc0
+    needed = ([:hc0], [])
+    @test needed == get_needed_robust_cov_stats(wanted)
+    
+    wanted = []
+    needed = ([], [])
+    @test needed == get_needed_robust_cov_stats(wanted)
+
+    wanted = :none
+    needed = ([], [])
+    @test needed == get_needed_robust_cov_stats(wanted)
+
+    wanted = :all
+    needed = ([:white, :hc0, :hc1, :hc2, :hc3], [:nw])
+    @test needed == get_needed_robust_cov_stats(wanted)
+
+end
+
 @testset "model stats massaging" begin
     wanted = ["r2", "rmse"]
     needed = Set([:r2, :rmse, :coefs, :sse, :mse, :sst])
