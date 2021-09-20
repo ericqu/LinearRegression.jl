@@ -131,16 +131,18 @@ function getVIF(x, intercept, updf, df, p)
         if p == 1
             return [0]
         end
-        vt = Symbol.(StatsBase.coefnames(updf.rhs))
-        results = Vector{Float64}(undef, length(vt))
+        vt = terms(updf.rhs)
+        results = Vector{Float64}()
         for (i, ct) in enumerate(vt)
-            tf = Term(ct) ~ term(0) + sum(term.(setdiff(vt, [ct])))
+            if ct isa InterceptTerm 
+                continue
+            end
+            tf = ct ~ sum(setdiff(vt, [ct]))
             cr = regress(tf, df, req_stats=[:r2])
-            results[i] = 1. / (1. - cr.R2)
+            push!(results, 1. / (1. - cr.R2))
         end
         return results
     end
-# return diag(inv(cor(x)))
 end
 
 """
