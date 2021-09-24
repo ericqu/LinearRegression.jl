@@ -1,5 +1,5 @@
 using LinearRegression
-using Test, DataFrames, CSV
+using Test, DataFrames
 using StatsModels
 
 include("test_sweep_operator.jl")
