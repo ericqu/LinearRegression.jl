@@ -8,5 +8,5 @@ deploydocs(
     push_preview = true,
     devbranch = "main",
     devurl = "dev",
-    versions = ["stable" => "v^", "v#.#", devurl => devurl],
+    versions = ["stable" => "v^", "v#.#", devurl => "dev"],
 )
