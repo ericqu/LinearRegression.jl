@@ -112,7 +112,7 @@ xe is scaled by ``\frac{1}{1 - H}`` then
 ```
 
 ##### HC3
-xe is scaled by ``\frac{1}{{\left( 1 - H \right) }^2}`` then 
+xe is scaled by ``\frac{1}{{\left( 1 - H \right)^2}}`` then 
 ```math
 \textup{HC3} = \sqrt{diag(\textup{InvMat } \textup{xe}' \textup{xe} \textup{ InvMat } )}
 ```
