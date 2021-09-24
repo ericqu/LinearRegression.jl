@@ -124,7 +124,6 @@ Newey-West estimator calculation is not documented yet.
 See [reference implementation](https://github.com/mcreel/Econometrics/blob/508aee681ca42ff1f361fd48cd64de6565ece221/src/NP/NeweyWest.jl) [current implementation](https://github.com/ericqu/LinearRegression.jl/blob/docu/src/newey_west.jl) for details.
 
 
----
 
 ## Functions
 ```@docs
