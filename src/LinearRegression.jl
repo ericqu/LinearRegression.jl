@@ -3,7 +3,7 @@ module LinearRegression
 using NamedArrays:length
 using LinearAlgebra:length
 using Distributions:length
-export regress, predict_and_stats
+export regress, predict_and_stats, linRegRes
 
 using Base: Tuple, Int64
 using StatsBase:eltype, isapprox, length, coefnames, push!
@@ -16,6 +16,11 @@ include("sweep_operator.jl")
 include("utilities.jl")
 include("newey_west.jl")
 
+"""
+    struct linRegRes 
+
+    Store results from the regression
+"""
 struct linRegRes 
     extended_inverse::Matrix                # Store the extended inverse matrix 
     coefs::Union{Nothing,Vector}            # Store the coefficients of the fitted model
@@ -201,9 +206,13 @@ function hasintercept(f::StatsModels.FormulaTerm)
 end
 
 """
-    function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame; α::Float64=0.05, req_stats=["all"], remove_missing=false)
+    function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame; α::Float64=0.05, req_stats=["all"], remove_missing=false, cov=[:none])
 
     Estimate the coefficients of the regression, given a dataset and a formula. 
+
+    The formula details are provided in the StatsModels package and the behaviour aims to be similar as what the Julia GLM package provides.
+    The data shall be provided as a DataFrame without missing data.
+    If remove_missing is set to true a copy of the dataframe will be made and the row with missing data will be removed.
 """
 function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame; α::Float64=0.05, req_stats=["all"], remove_missing=false, cov=[:none])
     intercept, f= hasintercept(f)
@@ -256,13 +265,13 @@ function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame; α::Float
         scalar_stats[:aic] =  n * log(sse / n) + 2p
     end
     if :sigma in needed_stats
-        scalar_stats[:sigma] = sse / (n - p)
+        scalar_stats[:sigma] = mse
     end
     if :t_statistic in needed_stats
         scalar_stats[:t_statistic] = quantile(TDist(n - p), 1 - α / 2)
     end
     if :stderror in needed_stats
-        vector_stats[:stderror] = sqrt.(diag(scalar_stats[:sigma] * @view(xytxy[1:end - 1, 1:end - 1])))
+        vector_stats[:stderror] = sqrt.(diag(mse * @view(xytxy[1:end - 1, 1:end - 1])))
     end
     if :t_values in needed_stats
         vector_stats[:t_values] = coefs ./ vector_stats[:stderror]
@@ -421,13 +430,13 @@ function heteroscedasticity(t::Symbol, x, y, coefs, intercept, n, p, xytxy)
         scale = @.( 1. / (1. - leverage))
         xe = @.(xe .* real(sqrt(Complex(scale))))
         xetxe = xe' * xe
-        return (t, sqrt.(diag(inv_xtx * xetxe * inv_xtx)))
+        return (t, sqrt.(diag(XX * xetxe * XX)))
     elseif t == :hc3
         leverage = diag(x * inv(x'x) * x')
         scale = @.( 1. / (1. - leverage)^2)
         xe = @.(xe .* real(sqrt(Complex(scale))))
         xetxe = xe' * xe
-        return (t, sqrt.(diag(inv_xtx * xetxe * inv_xtx)))
+        return (t, sqrt.(diag(XX * xetxe * XX)))
     else
         throw(error("Unknown symbol ($(t)) used as the White's covariance estimator"))
     end
