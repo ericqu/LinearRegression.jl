@@ -5,5 +5,8 @@ makedocs(sitename="LinearRegression.jl")
 
 deploydocs(
     repo = "github.com/ericqu/LinearRegression.jl.git",
-    push_preview = true
+    push_preview = true,
+    devbranch = "main",
+    devurl = "dev",
+    versions = ["stable" => "v^", "v#.#", devurl => devurl],
 )
