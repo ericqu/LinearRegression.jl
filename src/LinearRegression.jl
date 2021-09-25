@@ -129,24 +129,14 @@ end
 function getVIF(x, intercept, updf, df, p)
     if intercept
         if p == 1
-            return [0., 1]
+            return [0., 1.]
         end
         return vcat(0, diag(inv(cor(@view(x[:, 2:end])))))
     else 
         if p == 1
-            return [0]
+            return [0.]
         end
-        vt = terms(updf.rhs)
-        results = Vector{Float64}()
-        for (i, ct) in enumerate(vt)
-            if ct isa InterceptTerm 
-                continue
-            end
-            tf = ct ~ sum(setdiff(vt, [ct]))
-            cr = regress(tf, df, req_stats=[:r2])
-            push!(results, 1. / (1. - cr.R2))
-        end
-        return results
+        return diag(inv(cor(x)))
     end
 end
 
