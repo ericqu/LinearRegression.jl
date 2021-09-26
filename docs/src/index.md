@@ -77,11 +77,6 @@ The p-values are computed using the F Distribution, the degree of freedom for ea
 
 #### Variance inflation factor
 Variance inflation factor (VIF) is calculated by taking the  diagonal elements of the inverse of the correlation matrix formed by the independent variables when there is an intercept in the model.
-When there is no intercept in the model the VIF is calculated with the traditionnal formula for each (i) independent variable.
-
-```math
-\mathrm{VIF}_i = \displaystyle \frac{1}{1-\mathrm{R}^2_i}
-```
 
 ### Robust covariance estimators
 
