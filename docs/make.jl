@@ -9,6 +9,3 @@ deploydocs(
     devbranch = "main",
     devurl = "dev",
 )
-# deploydocs(
-#     repo = "github.com/ericqu/LinearRegression.jl.git"
-#     )
