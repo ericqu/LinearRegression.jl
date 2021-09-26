@@ -76,7 +76,7 @@ The lower bound of the confidence interval for each coefficient is calculated as
 The p-values are computed using the F Distribution, the degree of freedom for each coefficent.
 
 #### Variance inflation factor
-Variance inflation factor (VIF) is calculated by taking the  diagonal elements of the inverse of the correlation matrix formed by the independent variables when there is an intercept in the model.
+Variance inflation factor (VIF) is calculated by taking the  diagonal elements of the inverse of the correlation matrix formed by the independent variables.
 
 ### Robust covariance estimators
 
