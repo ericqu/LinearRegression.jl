@@ -1,3 +1,4 @@
+[![](https://img.shields.io/badge/docs-dev-blue.svg)](https://ericqu.github.io/LinearRegression.jl/dev/)
 # LinearRegression.jl
 
 LinearRegression.jl implements linear regression using the least-squares algorithm (relying on the sweep operator). This package is in the alpha stage. Hence it is likely that some bugs exist. Furthermore, the API might change in future versions. User's or prospective users' feedback is welcome.
