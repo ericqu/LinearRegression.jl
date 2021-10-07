@@ -84,7 +84,7 @@ Variance inflation factor (VIF) is calculated by taking the  diagonal elements o
 The user can select estimators from these list. If the user select "White" as an estimator then HC3 will be selected for a small size (n < 250) otherwise HC0 will be selected.
 ##### HC0
 The following estimators can be calculated.
-Having InvMat the pseudo inverse resulting from the sweep operator. And having xe being the matrix of the independent variables times the residuals. Then HC0 is calculated as:
+Having InvMat the pseudo inverse resulting from the sweep operator. And having ``xe`` being the matrix of the independent variables times the residuals. Then HC0 is calculated as:
 ```math
 \textup{HC0} = \sqrt{diag(\textup{InvMat } \textup{xe}' \textup{xe} \textup{ InvMat})}
 ```
@@ -101,13 +101,13 @@ The leverage or hat matrix is calculated as:
 \textup{H} = \textup{X} (\textup{X'X})^{-1}\textup{X'}
 ```
 
-xe is scaled by ``\frac{1}{1 - H}`` then 
+``xe`` is scaled by ``\frac{1}{1 - H}`` then 
 ```math
 \textup{HC2} = \sqrt{diag(\textup{InvMat } \textup{xe}' \textup{xe} \textup{ InvMat } )}
 ```
 
 ##### HC3
-xe is scaled by ``\frac{1}{{\left( 1 - H \right)^2}}`` then 
+``xe`` is scaled by ``\frac{1}{{\left( 1 - H \right)^2}}`` then 
 ```math
 \textup{HC3} = \sqrt{diag(\textup{InvMat } \textup{xe}' \textup{xe} \textup{ InvMat } )}
 ```
