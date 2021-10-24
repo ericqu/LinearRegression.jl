@@ -3,7 +3,7 @@
 ```
 LinearRegression.jl implements linear regression using the least-squares algorithm (relying on the sweep operator). This package is in the alpha stage. Hence it is likely that some bugs exist. Furthermore, the API might change in future versions.
 
-The usage aims to be straightforward, a call to ```regress``` to build a linear regression model, and a call to ```predict_and_stats``` to predict data using the built linear regression model.
+The usage aims to be straightforward, a call to ```regress``` to build a linear regression model, and a call to ```predict_in_sample``` to predict data using the built linear regression model.
 
 The regress call will compute some statistics about the fitted model in addition to the coefficients. 
 
@@ -123,7 +123,7 @@ See [reference implementation](https://github.com/mcreel/Econometrics/blob/508ae
 ## Functions
 ```@docs
 regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame; α::Float64=0.05, req_stats=["all"], remove_missing=false, cov=[:none])
-predict_and_stats(lr::linRegRes, df::DataFrames.DataFrame; α=0.05, req_stats=["none"])
+predict_in_sample(lr::linRegRes, df::DataFrames.DataFrame; α=0.05, req_stats=["none"])
 ```
 
 ## Index

@@ -14,10 +14,10 @@
                 )
        
         t_lm_base = regress(@formula(Y ~ 1+ XA), st_df)
-        results = predict_and_stats(t_lm_base, st_df, req_stats=["all"])
+        results = predict_in_sample(t_lm_base, st_df, req_stats=["all"])
         @test isapprox(st_df.CooksD_base, results.cooksd)
 
         t_lm_multi = regress(@formula(Y ~ 1+ XA + XB), st_df)
-        results = predict_and_stats(t_lm_multi, st_df, req_stats=["all"])
+        results = predict_in_sample(t_lm_multi, st_df, req_stats=["all"])
         @test isapprox(st_df.CooksD_multi, results.cooksd)
 end
