@@ -30,13 +30,14 @@ Used observations:      20
 Model statistics:
   R²: 0.938467                  Adjusted R²: 0.935049
   MSE: 1.01417                  RMSE: 1.00706
-  σ̂²: 1.01417                   AIC: 2.17421
+  σ̂²: 1.01417
 Confidence interval: 95%
+
 Coefficients statistics:
-Terms ╲ Stats │       Coefs      Std err            t     Pr(>|t|)       low ci      high ci          VIF
-──────────────┼──────────────────────────────────────────────────────────────────────────────────────────
-(Intercept)   │    -2.44811     0.819131     -2.98867     0.007877     -4.16904    -0.727184          0.0
-x             │     27.6201      1.66699      16.5688  2.41337e-12      24.1179      31.1223          1.0
+Terms ╲ Stats │       Coefs      Std err            t     Pr(>|t|)       low ci      high ci
+──────────────┼─────────────────────────────────────────────────────────────────────────────
+(Intercept)   │    -2.44811     0.819131     -2.98867     0.007877     -4.16904    -0.727184
+x             │     27.6201      1.66699      16.5688  2.41337e-12      24.1179      31.1223
 ```
 
 # Contrasts with Julia Stats GLM package
@@ -46,13 +47,13 @@ LinearRegression now accept model without intercept. Like models made with GLM t
 
 LinearRegression now supports analytical weights; GLM supports frequency weights.
 
-Both LinearRegression and GLM rely on StatsModels.jl for the model's description (@formula); hence it is easy to move between the two packages. Similarly, categorical variables are defined in the same way facilitating moving from one to the other when needed.
+Both LinearRegression and GLM rely on StatsModels.jl for the model's description (@formula); hence it is easy to move between the two packages. Similarly, contrasts and categorical variables are defined in the same way facilitating moving from one to the other when needed.
 
 LinearRegression relies on the Sweep operator to estimate the coefficients, and GLM depends on Cholesky and QR factorizations.
 
 The Akaike information criterion (AIC) is calculated with the formula relevant only for Linear Regression hence enabling comparison between linear regressions (AIC=n log(SSE / n) + 2p; where SSE is the Sum of Squared Errors and p is the number of predictors). On the other hand, the AIC calculated with GLM is more general (based on log-likelihood), enabling comparison between a broader range of models.
 
-Linear Regression provide access to some robust covariance estimators (for Heteroscedasticity: White, HC0, HC1, HC2 and HC3 and for HAC: Newey-West)
+LinearRegression package provides access to some robust covariance estimators (for Heteroscedasticity: White, HC0, HC1, HC2 and HC3 and for HAC: Newey-West)
 
 # List of Statistics 
 ## List of Statistics calculated about the linear regression model:
@@ -105,44 +106,43 @@ First, a simulation of some data with a polynomial function.
 
 ```julia 
 using LinearRegression, DataFrames, StatsModels
-using Distributions # for the data generation with Normal()
-using VegaLite # for plotting
+using Distributions # for the data generation with Normal() and Uniform()
+using VegaLite
 
 # Data simulation
-f(x) = @. (x^3 + 2.2345x - 1.2345 + rand(Normal(0, 3)))
+f(x) = @. (x^3 + 2.2345x - 1.2345 + rand(Normal(0, 20)))
 xs = [x for x in -2:0.1:8]
 ys = f(xs)
 vdf = DataFrame(y=ys, x=xs)
-
 ```
 Then we can make the first model and look at the results:
 
 ```julia 
-lr = regress(@formula(y ~ 1 + x ), vdf)
+lr, ps = regress(@formula(y ~ 1 + x^3 ), vdf, "all", 
+    req_stats=["default", "vif", "AIC"], 
+    plot_args=Dict("plot_width" => 200 ))
+lr
 ```
 ```
-Model definition:  y ~ 1 + x
+Model definition:       y ~ 1 + x
 Used observations:      101
 Model statistics:
-  R²: 0.770534                  Adjusted R²: 0.768216
-  MSE: 5169.6                   RMSE: 71.8999
-  σ̂²: 5169.6                    AIC: 865.586
+  R²: 0.750957                  Adjusted R²: 0.748441
+  MSE: 5693.68                  RMSE: 75.4565
+  σ̂²: 5693.68                   AIC: 875.338
 Confidence interval: 95%
+
 Coefficients statistics:
 Terms ╲ Stats │       Coefs      Std err            t     Pr(>|t|)       low ci      high ci          VIF
 ──────────────┼──────────────────────────────────────────────────────────────────────────────────────────
-(Intercept)   │    -24.8724      10.2654     -2.42292    0.0172133     -45.2412     -4.50351          0.0
-x             │     44.7417      2.45391      18.2329  2.06014e-33      39.8727      49.6108          1.0
+(Intercept)   │    -24.5318      10.7732     -2.27711    0.0249316     -45.9082     -3.15535          0.0
+x             │     44.4953      2.57529      17.2778  1.20063e-31      39.3854      49.6052          1.0
 ```
 This is pretty good, so let's further review some diagnostic plots.
 
 ```julia
-select(results, [:predicted, :y]) |> @vlplot(
-    :point, 
-    x = { :predicted,  axis = {grid = false}},
-    y = { :y, axis = {grid = false}},
-    title = "Predicted vs actual", width = 400, height = 400
-)
+[[ps["fit"] ps["residuals"]]
+    [ps["histogram density"] ps["qq plot"]]]
 ```
 ![Predicted vs actual model 1](https://github.com/ericqu/LinearRegression.jl/raw/main/assets/asset_exe_001.svg "Predicted vs actual model 1")
 
