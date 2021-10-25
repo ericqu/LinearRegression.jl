@@ -144,7 +144,7 @@ This is pretty good, so let's further review some diagnostic plots.
 [[ps["fit"] ps["residuals"]]
     [ps["histogram density"] ps["qq plot"]]]
 ```
-![Overview Plots (https://github.com/ericqu/LinearRegression.jl/raw/main/assets/asset_exe_072_01.svg "Overview Plots")
+![Overview Plots](https://github.com/ericqu/LinearRegression.jl/raw/main/assets/asset_exe_072_01.svg "Overview Plots")
 
 Please note that for the fit plot, the orange line shows the regression line, in dark grey the confidence interval for the mean, and in light grey the interval for the individuals predictions.
 
@@ -173,7 +173,7 @@ x ^ 3         │     1.04075    0.0151001      68.9236  1.77641e-85      1.0107
 ```
  
 Lets look at the updated plots:
-![Overview Plots (https://github.com/ericqu/LinearRegression.jl/raw/main/assets/asset_exe_072_02.svg "Overview Plots")
+![Overview Plots](https://github.com/ericqu/LinearRegression.jl/raw/main/assets/asset_exe_072_02.svg "Overview Plots")
 
 While this is not interesting for this dataset, we can still request some robust covariance estimators in this way:
 
