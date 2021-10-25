@@ -171,8 +171,6 @@ Terms ╲ Stats │       Coefs      Std err            t     Pr(>|t|)       low
 (Intercept)   │     1.23626      2.65774     0.465157     0.642841     -4.03726      6.50979          0.0
 x ^ 3         │     1.04075    0.0151001      68.9236  1.77641e-85      1.01079      1.07071          1.0
 ```
- 
-Lets look at the updated plots:
 ![Overview Plots](https://github.com/ericqu/LinearRegression.jl/raw/main/assets/asset_exe_072_02.svg "Overview Plots")
 
 While this is not interesting for this dataset, we can still request some robust covariance estimators in this way:
