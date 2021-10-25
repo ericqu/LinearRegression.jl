@@ -176,8 +176,7 @@ x ^ 3         │     1.04075    0.0151001      68.9236  1.77641e-85      1.0107
 While this is not interesting for this dataset, we can still request some robust covariance estimators in this way:
 
 ```julia 
-lr = regress(@formula(y ~ 1 + x^3 ), vdf, 
-    req_stats=["default", "vif", "AIC"], cov=["white", "nw"])
+lr = regress(@formula(y ~ 1 + x^3 ), vdf, cov=["white", "nw"])
 ```
 Giving:
 ```
@@ -199,6 +198,43 @@ Terms ╲ Stats │       Coefs      Std err            t     Pr(>|t|)       low
 ──────────────┼─────────────────────────────────────────────────────────────────────────────
 (Intercept)   │     1.23626       2.4218     0.510472     0.610857     -3.56912      6.04165
 x ^ 3         │     1.04075    0.0129463      80.3897  5.60424e-92      1.01506      1.06644
+```
+
+And here is a minimal example of weighted regression:
+```julia 
+tw = [
+    2.3  7.4  0.058 
+    3.0  7.6  0.073 
+    2.9  8.2  0.114 
+    4.8  9.0  0.144 
+    1.3 10.4  0.151 
+    3.6 11.7  0.119 
+    2.3 11.7  0.119 
+    4.6 11.8  0.114 
+    3.0 12.4  0.073 
+    5.4 12.9  0.035 
+    6.4 14.0  0
+] # data from https://blogs.sas.com/content/iml/2016/10/05/weighted-regression.html
+
+df = DataFrame(tw, [:y,:x,:w])
+lm = regress(@formula(y ~ x), df, weights="w")
+```
+Which gives the following output:
+```
+Model definition:       y ~ 1 + x
+Used observations:      10
+Weighted regression
+Model statistics:
+  R²: 0.0149549                 Adjusted R²: -0.108176
+  MSE: 0.182858                 RMSE: 0.427619
+  σ̂²: 0.182858
+Confidence interval: 95%
+
+Coefficients statistics:
+Terms ╲ Stats │     Coefs    Std err          t   Pr(>|t|)     low ci    high ci
+──────────────┼─────────────────────────────────────────────────────────────────
+(Intercept)   │   2.32824    2.55186   0.912367   0.388242   -3.55637    8.21285
+x             │ 0.0853571   0.244924   0.348505   0.736455  -0.479438   0.650152
 ```
 
 
