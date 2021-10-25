@@ -119,14 +119,14 @@ function qqplot(results, fitted_residuals, plot_width)
     qqldf = DataFrame(x=qqline, y=qqline)
 
     qqplot = qqdf |> @vlplot() + @vlplot(
-            title = "Residuals QQ-Plot", 
-            width = plot_width, height = plot_width, 
-            :point,
-            x = {:x, type = :quantitative, title = "Theoritical quantiles", axis = {grid = false}, scale = {zero = false, padding = 5}}, 
-            y = {:y, type = :quantitative, title = "Empirical quantiles", axis = {grid = false}, scale = {zero = false, padding = 5} }
+        title = "Residuals QQ-Plot", 
+        width = plot_width, height = plot_width, 
+        :point,
+        x = {:x, type = :quantitative, title = "Theoritical quantiles", axis = {grid = false}, scale = {zero = false, padding = 5}}, 
+        y = {:y, type = :quantitative, title = "Empirical quantiles", axis = {grid = false}, scale = {zero = false, padding = 5} }
         ) + @vlplot(
-            {:line, color = "darkgrey"}, 
-            data = qqldf, x = {:x, type = :quantitative}, y = {:y, type = :quantitative} )
+        {:line, color = "darkgrey"}, 
+        data = qqldf, x = {:x, type = :quantitative}, y = {:y, type = :quantitative} )
 
     return qqplot
 end
