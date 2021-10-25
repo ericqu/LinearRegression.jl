@@ -101,7 +101,7 @@ Please post your questions, feedabck or issues in the Issues tabs. As much as po
 # Example
 
 The following is a short example illustrating some statistics about the predicted data.
-First, we simulate some data with a polynomial function.
+First, a simulation of some data with a polynomial function.
 
 ```julia 
 using LinearRegression, DataFrames, StatsModels

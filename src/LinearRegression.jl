@@ -3,7 +3,7 @@ module LinearRegression
 using NamedArrays:length
 using LinearAlgebra:length
 using Distributions:length
-export regress, predict_in_sample, predict_out_of_sample, linRegRes, predict
+export regress, predict_in_sample, predict_out_of_sample, linRegRes
 
 using Base: Tuple, Int64, Float64, Bool
 using StatsBase:eltype, isapprox, length, coefnames, push!, append!
@@ -245,9 +245,9 @@ function hasintercept(f::StatsModels.FormulaTerm)
 end
 
 """
-regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame, req_plots; α::Float64=0.05, req_stats=["default"],
-                weights::Union{Nothing,String}=nothing, remove_missing=false, cov=[:none], contrasts=nothing, 
-                normality_test=false, plot_args=Dict("plot_width" => 400, "loess_bw" => 0.6))
+    function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame, req_plots; α::Float64=0.05, req_stats=["default"],
+    weights::Union{Nothing,String}=nothing, remove_missing=false, cov=[:none], contrasts=nothing, 
+    plot_args=Dict("plot_width" => 400, "loess_bw" => 0.6, "residuals_with_density" => false))
 
 Estimate the coefficients of the regression, given a dataset and a formula. and provide the requested plot(s).
 """
@@ -283,7 +283,8 @@ function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame, req_plots
 end
         
 """
-    function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame; α::Float64=0.05, req_stats=["all"], remove_missing=false, cov=[:none], contrasts=nothing)
+    function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame; α::Float64=0.05, req_stats=["default"], weights::Union{Nothing,String}=nothing,
+    remove_missing=false, cov=[:none], contrasts=nothing)
 
     Estimate the coefficients of the regression, given a dataset and a formula. 
 
@@ -586,7 +587,7 @@ function heteroscedasticity(t::Symbol, x, y, coefs, intercept, n, p, xytxy)
 end
 
 """
-    predict_out_of_sample(lr::linRegRes, df::DataFrames.DataFrame; α=0.05, req_stats=["none"], dropmissingvalues = true)
+    function predict_out_of_sample(lr::linRegRes, df::DataFrames.DataFrame; α=0.05, req_stats=["none"], dropmissingvalues=true)
 
     use the coefficients from a regression make predictions based on data (not including the response variable) from a DataFrame.
 """
@@ -673,7 +674,7 @@ function predict_out_of_sample(lr::linRegRes, df::DataFrames.DataFrame; α=0.05,
 end
 
 """
-    function predict_in_sample(lr::linRegRes, df::DataFrames.DataFrame; α=0.05, req_stats=["none"], dropmissingvalues = true)
+    function predict_in_sample(lr::linRegRes, df::DataFrames.DataFrame; α=0.05, req_stats=["none"], dropmissingvalues=true)
 
     Using the estimated coefficients from the regression make predictions, and calculate related statistics.
 """
