@@ -99,7 +99,7 @@ Please post your questions, feedabck or issues in the Issues tabs. As much as po
 - http://hua-zhou.github.io/teaching/biostatm280-2019spring/slides/12-sweep/sweep.html
 - https://github.com/mcreel/Econometrics for the Newey-West implementation
 
-# Example
+# Examples
 
 The following is a short example illustrating some statistics about the predicted data.
 First, a simulation of some data with a polynomial function.
