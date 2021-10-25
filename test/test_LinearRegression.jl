@@ -1,10 +1,7 @@
-# include("../src/LinearRegression.jl")
 
 @testset "from glm" begin 
-
-    fdf = DataFrame([[0.1,0.3,0.5,0.6,0.7,0.9],[0.086,0.269,0.446,0.538,0.626,0.782]], [:Carb, :OptDen])
-
-    lm1 = regress(@formula(OptDen ~ 1 + Carb), fdf)
+    fdf = DataFrame(Carb=[0.1,0.3,0.5,0.6,0.7,0.9], OptDen=[0.086,0.269,0.446,0.538,0.626,0.782])
+    lm1 = regress(@formula(OptDen ~ 1 + Carb), fdf, req_stats="all")
     target_coefs = [0.005085714285713629, 0.8762857142857156]
     @test isapprox(target_coefs, lm1.coefs)
     @test lm1.p == 2 
@@ -19,18 +16,14 @@
     @test isapprox(lm1.ci_up, [0.02683549469867456, 0.9138636114098853])
     @test isapprox(lm1.t_statistic, 2.7764451051977934)
     @test isapprox(lm1.VIF, [0.,  1.])
-
 end
 
 @testset "from glm regresspredict" begin 
-
-    fdf = DataFrame([[0.1,0.3,0.5,0.6,0.7,0.9],[0.086,0.269,0.446,0.538,0.626,0.782]], [:Carb, :OptDen])
-
-    lm1 = regress(@formula(OptDen ~ 1 + Carb), fdf, α=0.05, req_stats=["all"])
+    fdf = DataFrame(Carb=[0.1,0.3,0.5,0.6,0.7,0.9], OptDen=[0.086,0.269,0.446,0.538,0.626,0.782])
+    lm1 = regress(@formula(OptDen ~ 1 + Carb), fdf, α=0.05, req_stats=[:default, :aic, :vif])
     target_coefs = [0.005085714285713629, 0.8762857142857156]
     @test isapprox(target_coefs, lm1.coefs)
     @test lm1.p == 2 
-
     @test isapprox(lm1.R2, 0.9990466748057584)
     @test isapprox(lm1.ADJR2, 0.998808343507198)
     @test isapprox(lm1.AIC, -55.43694668654871) # using the SAS formula rather than the Julia-Statsmodel-GLM
@@ -62,6 +55,33 @@ end
 
 end
 
+@testset "weighted regression" begin 
+    tw = [
+        2.3  7.4  0.058 
+        3.0  7.6  0.073 
+        2.9  8.2  0.114 
+        4.8  9.0  0.144 
+        1.3 10.4  0.151 
+        3.6 11.7  0.119 
+        2.3 11.7  0.119 
+        4.6 11.8  0.114 
+        3.0 12.4  0.073 
+        5.4 12.9  0.035 
+        6.4 14.0  0
+    ]
+    
+    df = DataFrame(tw, [:y,:x,:w])
+    f = @formula(y ~ x)
+    lm = regress(f, df, weights="w")
+
+    @test isapprox([2.328237176867885, 0.08535712911515277], lm.coefs)
+    @test isapprox(0.014954934572439349, lm.R2)
+    @test isapprox(-0.10817569860600562, lm.ADJR2)
+    @test isapprox([2.551864989438224, 0.24492357920520605], lm.stderrors)
+    @test isapprox([0.3882424860021164, 0.7364546437428148], lm.p_values)
+
+end
+
 @testset "predictions statistics" begin
     t_carb = [0.1, 0.3, 0.5, 0.6, 0.7, 0.9]
     t_optden = [0.086, 0.269, 0.446, 0.538, 0.626, 0.782]
@@ -83,24 +103,28 @@ end
 
     fdf = DataFrame([[0.1,0.3,0.5,0.6,0.7,0.9],[0.086,0.269,0.446,0.538,0.626,0.782]], [:Carb, :OptDen])
     lm1 = regress(@formula(OptDen ~ 1 + Carb), fdf)
-    results = predict_and_stats(lm1, fdf, α= 0.05, req_stats=["all"])
-    @test t_leverage == results.leverage 
-    @test t_predicted == results.predicted 
-    @test t_residuals == results.residuals 
-    @test t_stdp == results.stdp 
-    @test t_stdi == results.stdi 
-    @test t_stdr == results.stdr 
-    @test t_student == results.student
-    @test t_rstudent == results.rstudent
-    @test t_lcli == results.lcli 
-    @test t_ucli == results.ucli 
-    @test t_lclp == results.lclp 
-    @test t_uclp == results.uclp 
-    @test t_press == results.press
-    @test t_cooksd == results.cooksd 
+    results = predict_in_sample(lm1, fdf, α=0.05, req_stats=["all"])
+    @test isapprox(t_leverage, results.leverage)
+    @test isapprox(t_predicted, results.predicted) 
+    @test isapprox(t_residuals, results.residuals)
+    @test isapprox(t_stdp, results.stdp)
+    @test isapprox(t_stdi, results.stdi)
+    @test isapprox(t_stdr, results.stdr)
+    @test isapprox(t_student, results.student)
+    @test isapprox(t_rstudent, results.rstudent)
+    @test isapprox(t_lcli, results.lcli)
+    @test isapprox(t_ucli, results.ucli)
+    @test isapprox(t_lclp, results.lclp)
+    @test isapprox(t_uclp, results.uclp)
+    @test isapprox(t_press, results.press)
+    @test isapprox(t_cooksd, results.cooksd)
 
-    results = predict_and_stats(lm1, fdf, α= 0.05, req_stats= ["none"])
-    @test t_predicted == results.predicted 
+    results = predict_in_sample(lm1, fdf, α=0.05, req_stats=["none"])
+    @test isapprox(t_predicted, results.predicted) 
+    @test_throws ArgumentError("column name :leverage not found in the data frame") t_leverage == results.leverage 
+
+    results = predict_out_of_sample(lm1, fdf)
+    @test isapprox(t_predicted, results.predicted)
     @test_throws ArgumentError("column name :leverage not found in the data frame") t_leverage == results.leverage 
 
 end

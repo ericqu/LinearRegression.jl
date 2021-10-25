@@ -3,7 +3,7 @@
 ```
 LinearRegression.jl implements linear regression using the least-squares algorithm (relying on the sweep operator). This package is in the alpha stage. Hence it is likely that some bugs exist. Furthermore, the API might change in future versions.
 
-The usage aims to be straightforward, a call to ```regress``` to build a linear regression model, and a call to ```predict_and_stats``` to predict data using the built linear regression model.
+The usage aims to be straightforward, a call to ```regress``` to build a linear regression model, and a call to ```predict_in_sample``` to predict data using the built linear regression model.
 
 The regress call will compute some statistics about the fitted model in addition to the coefficients. 
 
@@ -119,11 +119,59 @@ Newey-West estimator calculation is not documented yet.
 See [reference implementation](https://github.com/mcreel/Econometrics/blob/508aee681ca42ff1f361fd48cd64de6565ece221/src/NP/NeweyWest.jl) [current implementation](https://github.com/ericqu/LinearRegression.jl/blob/docu/src/newey_west.jl) for details.
 
 
+#### Weighted regression
+
+This version is the initial implementation of a weighted regression using analytical weights.
+Here is a minimal example illustrating its usage.
+```julia 
+tw = [
+    2.3  7.4  0.058 
+    3.0  7.6  0.073 
+    2.9  8.2  0.114 
+    4.8  9.0  0.144 
+    1.3 10.4  0.151 
+    3.6 11.7  0.119 
+    2.3 11.7  0.119 
+    4.6 11.8  0.114 
+    3.0 12.4  0.073 
+    5.4 12.9  0.035 
+    6.4 14.0  0
+] # data from https://blogs.sas.com/content/iml/2016/10/05/weighted-regression.html
+
+df = DataFrame(tw, [:y,:x,:w])
+lm = regress(@formula(y ~ x), df, weights="w")
+```
+Which gives the following output:
+```
+Model definition:       y ~ 1 + x
+Used observations:      10
+Weighted regression
+Model statistics:
+  R²: 0.0149549                 Adjusted R²: -0.108176
+  MSE: 0.182858                 RMSE: 0.427619
+  σ̂²: 0.182858
+Confidence interval: 95%
+
+Coefficients statistics:
+Terms ╲ Stats │     Coefs    Std err          t   Pr(>|t|)     low ci    high ci
+──────────────┼─────────────────────────────────────────────────────────────────
+(Intercept)   │   2.32824    2.55186   0.912367   0.388242   -3.55637    8.21285
+x             │ 0.0853571   0.244924   0.348505   0.736455  -0.479438   0.650152
+```
+
 
 ## Functions
 ```@docs
-regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame; α::Float64=0.05, req_stats=["all"], remove_missing=false, cov=[:none])
-predict_and_stats(lr::linRegRes, df::DataFrames.DataFrame; α=0.05, req_stats=["none"])
+    function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame, req_plots; α::Float64=0.05, req_stats=["default"],
+    weights::Union{Nothing,String}=nothing, remove_missing=false, cov=[:none], contrasts=nothing, 
+    plot_args=Dict("plot_width" => 400, "loess_bw" => 0.6, "residuals_with_density" => false))
+
+function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame; α::Float64=0.05, req_stats=["default"], weights::Union{Nothing,String}=nothing, remove_missing=false, cov=[:none], contrasts=nothing)
+
+function predict_in_sample(lr::linRegRes, df::DataFrames.DataFrame; α=0.05, req_stats=["none"], dropmissingvalues=true)
+
+function predict_out_of_sample(lr::linRegRes, df::DataFrames.DataFrame; α=0.05, req_stats=["none"], dropmissingvalues=true)
+
 ```
 
 ## Index

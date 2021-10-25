@@ -1,3 +1,31 @@
+get_all_plots_types() = Set([:fitplot, :residuals_plots, :normal_checks, :cooksd, :leverage, :homoscedasticity])
+get_needed_plots(s::String) = return get_needed_plots([s])
+get_needed_plots(s::Symbol) = return get_needed_plots([s])
+get_needed_plots(s::Vector{String}) = return get_needed_plots(Symbol.(lowercase.(s)))
+get_needed_plots(::Vector{Any}) = return get_needed_plots([:none])
+get_needed_plots(::Set{Any}) = return get_needed_plots([:none])
+get_needed_plots(s::Set{Symbol}) = return get_needed_plots(collect(s))
+
+function get_needed_plots(p::Vector{Symbol})
+
+    needed_plots = Set{Symbol}()
+    length(p) == 0 && return needed_plots
+    :none in p && return needed_plots
+
+    if :all in p
+        return get_all_plots_types()
+    end
+
+    :fitplot in p && push!(needed_plots, :fitplot)
+    :residuals_plots in p && push!(needed_plots, :residuals_plots)
+    :normal_checks in p && push!(needed_plots, :normal_checks)
+    :cooksd in p && push!(needed_plots, :cooksd)
+    :leverage in p && push!(needed_plots, :leverage)
+    :homoscedasticity in p && push!(needed_plots, :homoscedasticity)
+    return needed_plots
+
+end
+
 """  
     get_robust_cov_stats()
 
@@ -30,7 +58,7 @@ function get_needed_robust_cov_stats(s::Vector{Symbol})
 
     :nw in s && push!(needed_hac, :nw)
 
-    return return (needed_white, needed_hac)
+    return (needed_white, needed_hac)
 
 end
 
@@ -39,7 +67,8 @@ end
 
     Returns all statistics availble for the fitted model.
 """
-get_all_model_stats() = Set([:coefs, :sse, :mse, :sst, :rmse, :aic, :sigma, :t_statistic, :vif, :r2, :adjr2, :stderror, :t_values, :p_values, :ci])
+get_all_model_stats() = Set([:coefs, :sse, :mse, :sst, :rmse, :aic, :sigma, :t_statistic, :vif, :r2, :adjr2, :stderror, :t_values, :p_values, :ci,
+                            :diag_normality, :diag_ks, :diag_ad, :diag_jb, :diag_heteroskedasticity, :diag_white, :diag_bp ])
 
 get_needed_model_stats(req_stats::String) = return get_needed_model_stats([req_stats])
 get_needed_model_stats(req_stats::Symbol) = return get_needed_model_stats(Set([req_stats]))
@@ -55,6 +84,7 @@ get_needed_model_stats(req_stats::Set{Symbol}) = get_needed_model_stats(collect(
 """
 function get_needed_model_stats(req_stats::Vector{Symbol})
     needed = Set([:coefs, :sse, :mse])
+    default = Set([:coefs, :sse, :mse, :sst, :rmse, :sigma, :t_statistic, :r2, :adjr2, :stderror, :t_values, :p_values, :ci])
     full = get_all_model_stats()
     unique!(req_stats)
 
@@ -62,13 +92,29 @@ function get_needed_model_stats(req_stats::Vector{Symbol})
     :none in req_stats && return needed
     :all in req_stats && return full
 
+    :default in req_stats && union!(needed, default)
+
     :sst in req_stats && push!(needed, :sst)
     :rmse in req_stats && push!(needed, :rmse)
     :aic in req_stats && push!(needed, :aic)
     :sigma in req_stats && push!(needed, :sigma)
     :t_statistic in req_stats && push!(needed, :t_statistic)
     :vif in req_stats && push!(needed, :vif)
-    
+    :diag_ks in req_stats && push!(needed, :diag_ks)
+    :diag_ad in req_stats && push!(needed, :diag_ad)
+    :diag_jb in req_stats && push!(needed, :diag_jb)
+    :diag_white in req_stats && push!(needed, :diag_white)
+    :diag_bp in req_stats && push!(needed, :diag_bp)
+
+    if :diag_normality in req_stats
+        push!(needed, :diag_ks)
+        push!(needed, :diag_ad)
+        push!(needed, :diag_jb)
+    end
+    if :diag_heteroskedasticity in req_stats
+        push!(needed, :diag_white)
+        push!(needed, :diag_bp)
+    end
     if :r2 in req_stats
         push!(needed, :sst)
         push!(needed, :r2)
@@ -275,3 +321,67 @@ function helper_print_table(io::IO, title, stats::Vector, stats_name::Vector, up
 end
 
 
+function present_breusch_pagan_test(X, residuals, α)
+    bpt = HypothesisTests.BreuschPaganTest(X, residuals)
+    pval = pvalue(bpt)
+    alpha_value= round((1 - α)*100, digits=3)
+    topresent = string("Breush-Pagan Test (heteroskedasticity of residuals):\n  T*R² statistic: $(round(bpt.lm, sigdigits=6))    degrees of freedom: $(round(bpt.dof, digits=6))    p-value: $(round(pval, digits=6))\n")
+    if pval > α
+        topresent *= "  with $(alpha_value)% confidence: fail to reject null hyposthesis.\n"
+    else 
+        topresent *= "  with $(alpha_value)% confidence: reject null hyposthesis.\n"
+    end
+    return topresent
+end
+
+function present_white_test(X, residuals, α)
+    bpt = HypothesisTests.WhiteTest(X, residuals)
+    pval = pvalue(bpt)
+    alpha_value= round((1 - α)*100, digits=3)
+    topresent = string("White Test (heteroskedasticity of residuals):\n  T*R² statistic: $(round(bpt.lm, sigdigits=6))    degrees of freedom: $(round(bpt.dof, digits=6))    p-value: $(round(pval, digits=6))\n")
+    if pval > α
+        topresent *= "  with $(alpha_value)% confidence: fail to reject null hyposthesis.\n"
+    else 
+        topresent *= "  with $(alpha_value)% confidence: reject null hyposthesis.\n"
+    end
+    return topresent
+end
+
+function present_kolmogorov_smirnov_test(residuals, α)
+    fitted_residuals = fit(Normal, residuals)
+    kst = HypothesisTests.ApproximateOneSampleKSTest(residuals, fitted_residuals)
+    pval = pvalue(kst)
+    KS_stat = sqrt(kst.n)*kst.δ
+    alpha_value= round((1 - α)*100, digits=3)
+    topresent = string("Kolmogorov-Smirnov test (Normality of residuals):\n  KS statistic: $(round(KS_stat, sigdigits=6))    observations: $(kst.n)    p-value: $(round(pval, digits=6))\n")
+    if pval > α
+        topresent *= "  with $(alpha_value)% confidence: fail to reject null hyposthesis.\n"
+    else 
+        topresent *= "  with $(alpha_value)% confidence: reject null hyposthesis.\n"
+    end
+end
+
+function present_anderson_darling_test(residuals, α)
+    fitted_residuals = fit(Normal, residuals)
+    adt = HypothesisTests.OneSampleADTest(residuals, fitted_residuals)
+    pval = pvalue(adt)
+    alpha_value= round((1 - α)*100, digits=3)
+    topresent = string("Anderson–Darling test (Normality of residuals):\n  A² statistic: $(round(adt.A², digits=6))    observations: $(adt.n)    p-value: $(round(pval, digits=6))\n")
+    if pval > α
+        topresent *= "  with $(alpha_value)% confidence: fail to reject null hyposthesis.\n"
+    else 
+        topresent *= "  with $(alpha_value)% confidence: reject null hyposthesis.\n"
+    end
+end
+
+function present_jarque_bera_test(residuals, α)
+    jbt = HypothesisTests.JarqueBeraTest(residuals)
+    pval = pvalue(jbt)
+    alpha_value= round((1 - α)*100, digits=3)
+    topresent = string("Jarque-Bera test (Normality of residuals):\n  JB statistic: $(round(jbt.JB, digits=6))    observations: $(jbt.n)    p-value: $(round(pval, digits=6))\n")
+    if pval > α
+        topresent *= "  with $(alpha_value)% confidence: fail to reject null hyposthesis.\n"
+    else 
+        topresent *= "  with $(alpha_value)% confidence: reject null hyposthesis.\n"
+    end
+end

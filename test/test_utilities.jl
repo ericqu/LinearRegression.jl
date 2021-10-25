@@ -1,5 +1,36 @@
 include("../src/utilities.jl")
 
+@testset "Plots request massaging" begin
+    wanted = "all"
+    needed = Set([:fitplot, :residuals_plots, :normal_checks, :cooksd, :leverage, :homoscedasticity])
+    @test needed == get_needed_plots(wanted)
+
+    wanted = []
+    needed = Set([])
+    @test needed == get_needed_plots(wanted)
+
+    wanted = :none
+    needed = Set()
+    @test needed == get_needed_plots(wanted)
+
+    wanted = Set()
+    needed = Set()
+    @test needed == get_needed_plots(wanted)
+
+    wanted = ["fitplot", "cooksd", "homoscedasticity"]
+    needed = Set([:fitplot, :cooksd, :homoscedasticity])
+    @test needed == get_needed_plots(wanted)
+
+    wanted = [:residuals_plots, :normal_checks]
+    needed = Set([:residuals_plots, :normal_checks])
+    @test needed == get_needed_plots(wanted)
+
+    wanted = :leverage
+    needed = Set([:leverage])
+    @test needed == get_needed_plots(wanted)
+
+end
+
 @testset "Covariance estimator stats massaging" begin
     wanted = [:white, :white , :bogus , :nw]
     needed = ([:white], [:nw])
@@ -44,6 +75,21 @@ include("../src/utilities.jl")
 end
 
 @testset "model stats massaging" begin
+    wanted = ["default"]
+    needed = Set([:coefs, :sse, :mse, :sst, :rmse, :sigma, :t_statistic, :r2, :adjr2, :stderror, :t_values, :p_values, :ci])
+    @test needed == get_needed_model_stats(wanted)
+    wanted = [:default, :vif]
+    needed = Set([:coefs, :sse, :vif, :mse, :sst, :rmse, :sigma, :t_statistic, :r2, :adjr2, :stderror, :t_values, :p_values, :ci])
+    @test needed == get_needed_model_stats(wanted)
+    wanted = [:default, :diag_ks]
+    needed = Set([:coefs, :sse, :diag_ks, :mse, :sst, :rmse, :sigma, :t_statistic, :r2, :adjr2, :stderror, :t_values, :p_values, :ci])
+    @test needed == get_needed_model_stats(wanted)
+    wanted = [:default, :diag_normality]
+    needed = Set([:coefs, :sse, :diag_ks, :diag_ad, :diag_jb, :mse, :sst, :rmse, :sigma, :t_statistic, :r2, :adjr2, :stderror, :t_values, :p_values, :ci])
+    @test needed == get_needed_model_stats(wanted)
+    wanted = [:default, :diag_heteroskedasticity]
+    needed = Set([:coefs, :sse, :diag_white, :diag_bp, :mse, :sst, :rmse, :sigma, :t_statistic, :r2, :adjr2, :stderror, :t_values, :p_values, :ci])
+    @test needed == get_needed_model_stats(wanted)
     wanted = ["r2", "rmse"]
     needed = Set([:r2, :rmse, :coefs, :sse, :mse, :sst])
     @test needed == get_needed_model_stats(wanted)
@@ -72,7 +118,8 @@ end
     needed = Set([:coefs, :mse, :sse])
     @test needed == get_needed_model_stats(wanted)
     wanted = ["all"]
-    needed = Set([:coefs, :sse, :mse, :sst, :rmse, :aic, :sigma, :t_statistic, :vif, :r2, :adjr2, :stderror, :t_values, :p_values, :ci])
+    needed = Set([:coefs, :sse, :mse, :sst, :rmse, :aic, :sigma, :t_statistic, :vif, :r2, :adjr2, :stderror, :t_values, :p_values, :ci,
+                    :diag_normality, :diag_ks, :diag_ad, :diag_jb, :diag_heteroskedasticity, :diag_white, :diag_bp ])
     @test needed == get_needed_model_stats(wanted)
     wanted = [ ]
     needed = Set([:coefs, :mse, :sse])
@@ -89,7 +136,6 @@ end
     wanted = Set()
     needed = Set([:coefs, :mse, :sse])
     @test needed == get_needed_model_stats(wanted)
-
 end
 
 
