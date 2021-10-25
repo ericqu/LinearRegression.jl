@@ -58,11 +58,11 @@ struct linRegRes
     dataschema                              # Store the dataschema
     updformula                              # Store the updated model formula (after the dataschema has been applied)
     alpha                                   # Store the alpha used to compute the confidence interval of the coefficients
-    KS_test::Union{Nothing, String}         # Store results of the Kolmogorov-Smirnov test
-    AD_test::Union{Nothing, String}         # Store results of the Anderson–Darling test
-    JB_test::Union{Nothing, String}         # Store results of the Jarque-Bera test
-    White_test::Union{Nothing, String}      # Store results of the White test
-    BP_test::Union{Nothing, String}         # Store results of the Breusch-Pagan test
+    KS_test::Union{Nothing,String}         # Store results of the Kolmogorov-Smirnov test
+    AD_test::Union{Nothing,String}         # Store results of the Anderson–Darling test
+    JB_test::Union{Nothing,String}         # Store results of the Jarque-Bera test
+    White_test::Union{Nothing,String}      # Store results of the White test
+    BP_test::Union{Nothing,String}         # Store results of the Breusch-Pagan test
     weighted::Bool                          # Indicates if is a weighted regression
 end
 
@@ -131,7 +131,7 @@ function Base.show(io::IO, lr::linRegRes)
     end
 
     if !isnothing(lr.KS_test) || !isnothing(lr.AD_test) || !isnothing(lr.JB_test) || !isnothing(lr.White_test) || !isnothing(lr.BP_test)
-        println("\nDiagnostic Tests:\n")
+        println(io, "\nDiagnostic Tests:\n")
         if !isnothing(lr.KS_test)
             print(io, lr.KS_test)
         end
@@ -245,37 +245,39 @@ function hasintercept(f::StatsModels.FormulaTerm)
 end
 
 """
-    function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame, req_plots; α::Float64=0.05, req_stats=["all"], remove_missing=false, cov=[:none], plot_args=Dict("plot_width" => 400 , "loess_bw"=> 0.6))
+regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame, req_plots; α::Float64=0.05, req_stats=["default"],
+                weights::Union{Nothing,String}=nothing, remove_missing=false, cov=[:none], contrasts=nothing, 
+                normality_test=false, plot_args=Dict("plot_width" => 400, "loess_bw" => 0.6))
 
-    Estimate the coefficients of the regression, given a dataset and a formula. and provide the requested plot(s).
+Estimate the coefficients of the regression, given a dataset and a formula. and provide the requested plot(s).
 """
-function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame, req_plots; α::Float64=0.05, req_stats=["all"], remove_missing=false, cov=[:none], contrasts=nothing, plot_args=Dict("plot_width" => 400 , "loess_bw"=> 0.6))
+function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame, req_plots; α::Float64=0.05, req_stats=["default"],
+                weights::Union{Nothing,String}=nothing, remove_missing=false, cov=[:none], contrasts=nothing, 
+                plot_args=Dict("plot_width" => 400, "loess_bw" => 0.6, "residuals_with_density" => false))
 
-    all_plots = Vector{VegaLite.VLSpec}()
+    all_plots = Dict{String,VegaLite.VLSpec}()
     neededplots = get_needed_plots(req_plots)
-    lm = regress(f, df, α=α, req_stats=req_stats, remove_missing=remove_missing, cov=cov, contrasts= contrasts)
+    lm = regress(f, df, α=α, req_stats=req_stats, remove_missing=remove_missing, cov=cov,
+                contrasts=contrasts, weights=weights)
     results = predict_in_sample(lm, df, req_stats="all")
 
     if :fitplot in neededplots
-        fplot = fitplot(results, lm, plot_args)
-        if !isnothing(fplot)
-            push!(all_plots, fplot)
-        end
+        fitplot!(all_plots, results, lm, plot_args)
     end
     if :residuals_plots in neededplots
-        append!(all_plots, residuals_plots(results, lm, plot_args))
+        residuals_plots!(all_plots, results, lm, plot_args)
     end
     if :normal_checks in neededplots
-        append!(all_plots, normality_plots(results, lm, plot_args))
+        normality_plots!(all_plots, results, lm, plot_args)
     end
     if :homoscedasticity in neededplots
-        push!(all_plots, scalelocation_plot(results, lm, plot_args))
+        scalelocation_plot!(all_plots, results, lm, plot_args)
     end
     if :cooksd in neededplots
-        push!(all_plots, cooksd_plot(results, lm, plot_args))
+        cooksd_plot!(all_plots, results, lm, plot_args)
     end
     if :leverage in neededplots
-        push!(all_plots, leverage_plot(results, lm, plot_args))
+        leverage_plot!(all_plots, results, lm, plot_args)
     end
     return (lm, all_plots)
 end
@@ -289,10 +291,12 @@ end
     The data shall be provided as a DataFrame without missing data.
     If remove_missing is set to true a copy of the dataframe will be made and the row with missing data will be removed.
     Some robust covariance estimator(s) can be requested through the ```cov``` argument.
-    Default contrast is dummey coding, other contrasts can be requested through the ```contrasts``` argument.
+    Default contrast is dummy coding, other contrasts can be requested through the ```contrasts``` argument.
+    For a weighted regression, the name of column containing the analytical weights shall be identified by the ```weights``` argument.
+
 """
-function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame; α::Float64=0.05, req_stats=["default"], weights::Union{Nothing, String}=nothing,
-                remove_missing=false, cov=[:none], contrasts=nothing, normality_test=false)
+function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame; α::Float64=0.05, req_stats=["default"], weights::Union{Nothing,String}=nothing,
+                remove_missing=false, cov=[:none], contrasts=nothing)
     intercept, f = hasintercept(f)
 
     (α > 0. && α < 1.) || throw(ArgumentError("α must be between 0 and 1"))
@@ -347,9 +351,9 @@ function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame; α::Float
     total_vector_stats = Set([:coefs, :stderror, :t_values, :p_values, :ci])
     total_diag_stats = Set([:diag_ks, :diag_ad, :diag_jb, :diag_white, :diag_bp])
 
-    scalar_stats = Dict{Symbol, Union{Nothing, Float64}}(intersect(total_scalar_stats, needed_stats) .=> nothing)
-    vector_stats = Dict{Symbol, Union{Nothing, Vector}}(intersect(total_vector_stats, needed_stats) .=> nothing)
-    diag_stats = Dict{Symbol, Union{Nothing, String}}(intersect(total_diag_stats, needed_stats) .=> nothing)
+    scalar_stats = Dict{Symbol,Union{Nothing,Float64}}(intersect(total_scalar_stats, needed_stats) .=> nothing)
+    vector_stats = Dict{Symbol,Union{Nothing,Vector}}(intersect(total_vector_stats, needed_stats) .=> nothing)
+    diag_stats = Dict{Symbol,Union{Nothing,String}}(intersect(total_diag_stats, needed_stats) .=> nothing)
 
 # optional stats
     if :sst in needed_stats
@@ -586,18 +590,18 @@ end
 
     use the coefficients from a regression make predictions based on data (not including the response variable) from a DataFrame.
 """
-function predict_out_of_sample(lr::linRegRes, df::DataFrames.DataFrame; α=0.05, req_stats=["none"], dropmissingvalues = true)
+function predict_out_of_sample(lr::linRegRes, df::DataFrames.DataFrame; α=0.05, req_stats=["none"], dropmissingvalues=true)
     copieddf = copy(df)
     if dropmissingvalues
         dropmissing!(copieddf)
     end
     x = modelcols(lr.updformula.rhs, copieddf)
-    n,p = size(x)
+    n, p = size(x)
     copieddf[!, :predicted] = lr_predict(x, lr.coefs, lr.intercept)
 
     needed, present = get_prediction_stats(req_stats)
     needed_stats = Dict{Symbol,Vector}()
-    for sym in needed
+        for sym in needed
         needed_stats[sym] = zeros(length(n))
     end
     if :leverage in needed
@@ -673,11 +677,11 @@ end
 
     Using the estimated coefficients from the regression make predictions, and calculate related statistics.
 """
-function predict_in_sample(lr::linRegRes, df::DataFrames.DataFrame; α=0.05, req_stats=["none"], dropmissingvalues = true)
+function predict_in_sample(lr::linRegRes, df::DataFrames.DataFrame; α=0.05, req_stats=["none"], dropmissingvalues=true)
 
     copieddf = df[: , Symbol.(keys(schema(lr.modelformula, df).schema))]
     if dropmissingvalues == true
-        dropmissing!(copieddf)
+    dropmissing!(copieddf)
     end
     dataschema = schema(lr.modelformula, copieddf)
     updatedformula = apply_schema(lr.modelformula, dataschema)
@@ -698,7 +702,7 @@ function predict_in_sample(lr::linRegRes, df::DataFrames.DataFrame; α=0.05, req
     if :residuals in needed
         needed_stats[:residuals] = y .- needed_stats[:predicted]
     end
-    if :stdp in needed
+        if :stdp in needed
         if isnothing(lr.σ̂²)
             throw(ArgumentError(":stdp requires that the σ̂² (:sigma) was previously calculated through the regression"))
         end
@@ -707,7 +711,7 @@ function predict_in_sample(lr::linRegRes, df::DataFrames.DataFrame; α=0.05, req
         end
         needed_stats[:stdp] = sqrt.(needed_stats[:leverage] .* lr.σ̂²)
     end
-    if :stdi in needed
+        if :stdi in needed
         if isnothing(lr.σ̂²)
             throw(ArgumentError(":stdi requires that the σ̂² (:sigma) was previously calculated through the regression"))
         end
@@ -716,7 +720,7 @@ function predict_in_sample(lr::linRegRes, df::DataFrames.DataFrame; α=0.05, req
         end
         needed_stats[:stdi] = sqrt.((1. .+ needed_stats[:leverage]) .* lr.σ̂²)
     end
-    if :stdr in needed
+        if :stdr in needed
         if isnothing(lr.σ̂²)
             throw(ArgumentError(":stdr requires that the σ̂² (:sigma) was previously calculated through the regression"))
         end
@@ -737,25 +741,25 @@ function predict_in_sample(lr::linRegRes, df::DataFrames.DataFrame; α=0.05, req
         end
         needed_stats[:rstudent] = needed_stats[:student] .* real.(sqrt.(complex.((n .- p .- 1 ) ./ (n .- p .- needed_stats[:student].^2 ), 0)))
     end
-    if :lcli in needed
+        if :lcli in needed
         if length(lr.white_types) + length(lr.hac_types) > 0
             println(io, "The LCLI statistic that relies on Sigma^2 has been requested. At least one robust covariance have been requested indicating that the assumptions needed for Sigma^2 may not be present.")
         end
         needed_stats[:lcli] = needed_stats[:predicted] .- (lr.t_statistic .* needed_stats[:stdi])
     end
-    if :ucli in needed
+        if :ucli in needed
         if length(lr.white_types) + length(lr.hac_types) > 0
             println(io, "The UCLI statistic that relies on Sigma^2 has been requested. At least one robust covariance have been requested indicating that the assumptions needed for Sigma^2 may not be present.")
         end
         needed_stats[:ucli] = needed_stats[:predicted] .+ (lr.t_statistic .* needed_stats[:stdi])
     end
-    if :lclp in needed
+        if :lclp in needed
         if length(lr.white_types) + length(lr.hac_types) > 0
             println(io, "The LCLP statistic that relies on Sigma^2 has been requested. At least one robust covariance have been requested indicating that the assumptions needed for Sigma^2 may not be present.")
         end
         needed_stats[:lclp] = needed_stats[:predicted] .- (lr.t_statistic .* needed_stats[:stdp])
     end
-    if :uclp in needed
+        if :uclp in needed
         if length(lr.white_types) + length(lr.hac_types) > 0
             println(io, "The UCLP statistic that relies on Sigma^2 has been requested. At least one robust covariance have been requested indicating that the assumptions needed for Sigma^2 may not be present.")
         end
@@ -771,7 +775,7 @@ function predict_in_sample(lr::linRegRes, df::DataFrames.DataFrame; α=0.05, req
         needed_stats[:cooksd] = needed_stats[:stdp].^2 ./  needed_stats[:stdr].^2 .* needed_stats[:student].^2 .* (1 / lr.p)
     end
 
-    for sym in present
+        for sym in present
         copieddf[!, sym] = needed_stats[sym]
     end
 

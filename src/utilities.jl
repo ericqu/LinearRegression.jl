@@ -329,7 +329,7 @@ function present_breusch_pagan_test(X, residuals, α)
     if pval > α
         topresent *= "  with $(alpha_value)% confidence: fail to reject null hyposthesis.\n"
     else 
-        topresent *= "  with $(alpha_value)% confidence: reject null hyposthesis.)\n"
+        topresent *= "  with $(alpha_value)% confidence: reject null hyposthesis.\n"
     end
     return topresent
 end

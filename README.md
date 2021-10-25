@@ -44,7 +44,7 @@ First, the GLM package provides more than linear regression with Ordinary Least-
 
 LinearRegression now accept model without intercept. Like models made with GLM the intercept is implicit, and to enable the no intercept the user must specify it in the formula (for instance ```y  ~ 0 + x```).
 
-LinearRegression does not support analytical weights (however, it is under consideration); GLM supports frequency weights.
+LinearRegression now supports analytical weights; GLM supports frequency weights.
 
 Both LinearRegression and GLM rely on StatsModels.jl for the model's description (@formula); hence it is easy to move between the two packages. Similarly, categorical variables are defined in the same way facilitating moving from one to the other when needed.
 
@@ -244,3 +244,10 @@ select(results, [:x, :cooksd]) |>
 
 ![x vs Cook's distance](https://github.com/ericqu/LinearRegression.jl/raw/main/assets/asset_exe_007.svg "x vs Cook's distance")
 
+## Notable changes since last version
+- Addition of weighted regression.
+- The function to predict values have been renamed. Now there is a function to predict in-sample values and one to predict out-of-sample values.
+- It is possible to generate, through Vega-lite, some plot about the regression being studied.
+- "contrasts" following the same syntax as GLM can be passed as a parameter to the ```regress``` function
+- it is possible to request some test about normality of the residuals and heteroscedasticity (this relies on the HypothesisTests package)
+- The documentation is started

@@ -4,7 +4,7 @@ using StatsBase, LinearAlgebra , Distributions # for the density/histogram plot
 isnotintercept(t::AbstractTerm) = t isa InterceptTerm ? false : true
 iscontinuousterm(t::AbstractTerm) = t isa ContinuousTerm ? true : false
 
-function fitplot(results, lm, plot_args)
+function fitplot!(all_plots, results, lm, plot_args)
 
     lhs = terms(lm.updformula.lhs)
     rhs_noint = filter(isnotintercept, terms(lm.updformula.rhs))
@@ -23,36 +23,29 @@ function fitplot(results, lm, plot_args)
     fp = select(results, [actx, acty, :ucli, :lcli, :uclp, :lclp, :predicted]) |> @vlplot(
         layer = [
             {   mark = {:errorband, color = "lightgrey" },
-                y = { field = :ucli, type = "quantitative", title = :y} ,
-                y2 = { field = :lcli, type = "quantitative", }, 
-                x = actx, 
+                y = { field = :ucli, type = :quantitative, title = acty} ,
+                y2 = { field = :lcli, type = :quantitative }, 
+                x = {actx, type = :quantitative}, 
             },
             {   mark = {:errorband, color = "darkgrey" },
-                y = { field = :uclp, type = "quantitative", title = :y}, 
-                y2 = { field = :lclp, type = "quantitative", }, 
-                x = actx, 
+                y = { field = :uclp, type = :quantitative, title = acty}, 
+                y2 = { field = :lclp, type = :quantitative }, 
+                x = {actx, type = :quantitative}, 
             },
-            {
-                mark = { :line, color = "darkorange", },
-                x = actx,
-                y = :predicted
+            {   mark = { :line, color = "darkorange" },
+                x = {actx, type = :quantitative},
+                y = {:predicted, type = :quantitative}
             },
-            {
-                :point, 
-                x = { actx,  axis = {grid = false}, scale = {zero = false, padding = 5}},
-                y = { acty, axis = {grid = false}, scale = {zero = false, padding = 5}},
+            {   :point, 
+                x = { actx, type = :quantitative, axis = {grid = false}, scale = {zero = false}},
+                y = { acty, type = :quantitative, axis = {grid = false}, scale = {zero = false}},
                 title = acttitle, width = plot_args["plot_width"], height = plot_args["plot_width"]
-    } ,
-        ]
-    )
-    return fp
+            },
+        ])
+    all_plots["fit"] = fp
 end
 
-function multiple_effect_plots(results, lm, plot_args)
-
-end
-
-function simple_residuals_plot(results, dep_var=nothing, show_density=true; plot_width=400, loess_bandwidth::Union{Nothing,Float64}=0.99)
+function simple_residuals_plot(results, dep_var=nothing, show_density=false; plot_width=400, loess_bandwidth::Union{Nothing,Float64}=0.99)
     if isnothing(dep_var)
         dep_var = :predicted
     end
@@ -62,9 +55,8 @@ function simple_residuals_plot(results, dep_var=nothing, show_density=true; plot
         loess_p = @vlplot(
             transform = [ { loess = :residuals, on = dep_var, bandwidth = loess_bandwidth } ],
             mark = {:line, color = "firebrick"},
-            x = dep_var,
-            y = :residuals
-            )
+            x = {dep_var, type = :quantitative},
+            y = {:residuals, type = :quantitative} )
     end
 
     title = "Residuals plot: $(string(dep_var))"
@@ -72,11 +64,13 @@ function simple_residuals_plot(results, dep_var=nothing, show_density=true; plot
 
     p = sresults |> 
     @vlplot(title = title, width = plot_width, height = plot_width,
-    x = {type = "quantitative", axis = {grid = false}, scale = {zero = false, padding = 5}},
-    y = {type = "quantitative", axis = {grid = false}}) +
-    @vlplot(:point, dep_var, :residuals) +
+        x = {type = :quantitative, axis = {grid = false}, scale = {zero = false, padding = 5}},
+        y = {type = :quantitative, axis = {grid = false}}) +
+    @vlplot(:point, 
+       x = {dep_var, type = :quantitative}, 
+       y = {:residuals, type = :quantitative}) +
     loess_p +
-    @vlplot(mark = {:rule, color = :darkgrey}, y = {datum = 0})
+    @vlplot(mark = {:rule, color = :darkgrey}, y = {type = :quantitative, datum = 0})
 
     if show_density == false
         return p
@@ -85,7 +79,7 @@ function simple_residuals_plot(results, dep_var=nothing, show_density=true; plot
     mp = sresults |> @vlplot(
         width = 100, height = plot_width,
         mark = {:area, orient = "horizontal"},
-        transform = [{density = :residuals, bandwidth = 0.4}],
+        transform = [{density = :residuals, bandwidth = 0.5}],
         x = {"density:q", title = nothing, axis = nothing},
         y = {"value:q", title = nothing, axis = nothing } )
         
@@ -94,25 +88,25 @@ function simple_residuals_plot(results, dep_var=nothing, show_density=true; plot
     return tp
 end
 
-function residuals_plots(results, lm, plot_args)
+function residuals_plots!(all_plots, results, lm, plot_args)
     rhs_noint = filter(isnotintercept, terms(lm.updformula.rhs))
     plots = Vector{VegaLite.VLSpec}()
     length(rhs_noint) == 0 && return nothing
 
-    plot_width = get(plot_args, "plot_width", nothing)
-    loess_bw = get(plot_args, "loess_bw", nothing)
+    plot_width = get(plot_args, "plot_width", 400)
+    loess_bw = get(plot_args, "loess_bw", 0.6)
+    density_requested = get(plot_args, "residuals_with_density", false)
 
     # main residual plot 
-    push!(plots, simple_residuals_plot(results, plot_width=plot_width, loess_bandwidth=loess_bw))
+    all_plots["residuals"] = simple_residuals_plot(results, plot_width=plot_width, loess_bandwidth=loess_bw)
 
     # additional plot per dependent variable
     for c_dependent_var in rhs_noint
         c_sym = c_dependent_var.sym
-        show_density = iscontinuousterm(c_dependent_var)
-        push!(plots, simple_residuals_plot(results, c_sym, show_density, plot_width=plot_width, loess_bandwidth=loess_bw))
+        show_density = density_requested && iscontinuousterm(c_dependent_var)
+        all_plots[string("residuals ", string(c_sym))] = simple_residuals_plot(results, c_sym, show_density, plot_width=plot_width, loess_bandwidth=loess_bw)
     end
 
-    return plots
 end
 
 function qqplot(results, fitted_residuals, plot_width)
@@ -128,11 +122,11 @@ function qqplot(results, fitted_residuals, plot_width)
             title = "Residuals QQ-Plot", 
             width = plot_width, height = plot_width, 
             :point,
-            x = {:x, title = "Theoritical quantiles", axis = {grid = false}, scale = {zero = false, padding = 5}}, 
-            y = {:y, title = "Empirical quantiles", axis = {grid = false}, scale = {zero = false, padding = 5} }
+            x = {:x, type = :quantitative, title = "Theoritical quantiles", axis = {grid = false}, scale = {zero = false, padding = 5}}, 
+            y = {:y, type = :quantitative, title = "Empirical quantiles", axis = {grid = false}, scale = {zero = false, padding = 5} }
         ) + @vlplot(
             {:line, color = "darkgrey"}, 
-            data = qqldf, x = :x, y = :y )
+            data = qqldf, x = {:x, type = :quantitative}, y = {:y, type = :quantitative} )
 
     return qqplot
 end
@@ -164,36 +158,31 @@ function histogram_density(results, fitted_residuals, plot_width)
     hdf = DataFrame(bs=bin_starts, be=bin_ends, y=counts)
     step_size = bin_starts[2] - bin_starts[1]
 
-    hdplot = hdf |> @vlplot(width = plot_width, height = plot_width, title = "Residuals Histogram and PDF") +
+    hdplot = hdf |> @vlplot(width = plot_width, height = plot_width, title = "Residuals: histogram and PDF") +
     @vlplot(
         :bar, 
-        x = {:bs, title = "residuals", bin = {binned = true, step = step_size}, axis = {grid = false}},
-        x2 = :be , 
-        y = {:y, stack = "zero",  axis = {grid = false} }
-    ) +
+        x = {:bs, type = :quantitative, title = "residuals", bin = {binned = true, step = step_size}, axis = {grid = false}},
+        x2 = {:be, type = :quantitative}, 
+        y = {:y, type = :quantitative, stack = "zero",  axis = {grid = false} } ) +
     @vlplot(
         data = tdf,
         {:line, color = "darkorange"}, 
-        x = {"x:q", scale = {zero = false}, axis = {grid = false}},
-    y = {"y:q", scale = {zero = false}, axis = {grid = false}}, 
-    ) 
+        x = {:x, type = :quantitative, scale = {zero = false}, axis = {grid = false}},
+        y = {:y, type = :quantitative, scale = {zero = false}, axis = {grid = false}} ) 
 
     return hdplot
 end
 
-function normality_plots(results, lm, plot_args)
-    plots = Vector{VegaLite.VLSpec}()
+function normality_plots!(all_plots, results, lm, plot_args)
+    # plots = Vector{VegaLite.VLSpec}()
     plot_width = get(plot_args, "plot_width", nothing)
     fitted_residuals = fit(Normal, results.residuals)
 
-    push!(plots, qqplot(results, fitted_residuals, plot_width))
-    push!(plots, histogram_density(results, fitted_residuals, plot_width))
-    
-    return plots
-
+    all_plots["qq plot"] = qqplot(results, fitted_residuals, plot_width)
+    all_plots["histogram density"] = histogram_density(results, fitted_residuals, plot_width)
 end
 
-function cooksd_plot(results, lm, plot_args)
+function cooksd_plot!(all_plots, results, lm, plot_args)
     plot_width = get(plot_args, "plot_width", nothing)
     plot_height = plot_width / 2
 
@@ -203,16 +192,16 @@ function cooksd_plot(results, lm, plot_args)
     threshold_cooksd = 4 / lm.observations
     p = sdf |> 
         @vlplot(title = "Cook's Distance", width = plot_width, height = plot_height) +
-        @vlplot(mark = {:rule, color = :darkgrey}, y = {datum = threshold_cooksd}) +
+        @vlplot(mark = {:rule, color = :darkgrey}, y = {type = :quantitative, datum = threshold_cooksd}) +
         @vlplot(
             mark = {:rule, color = :steelblue},
             x = {:Observations, type = :quantitative, axis = {grid = false}},
-            y = {datum = 0}, y2 = :cooksd
-            ) 
-    return p 
-end
+            y = {type = :quantitative, datum = 0}, y2 = {:cooksd, type = :quantitative} ) 
 
-function scalelocation_plot(results, lm, plot_args)
+    all_plots["cooksd"] = p
+    end
+
+function scalelocation_plot!(all_plots, results, lm, plot_args)
     plot_width = get(plot_args, "plot_width", nothing)
     sdf = select(results, [:predicted, :student])
     sdf.sqrtstudent = sqrt.(abs.(sdf.student))
@@ -223,26 +212,27 @@ function scalelocation_plot(results, lm, plot_args)
                 title = "Scale and location plot" , 
                 width = plot_width , height = plot_width,
                 :point, 
-                x = {:predicted,  scale = {zero = false}, axis = { grid = false} },
-                y = {:sqrtstudent, title = "√student", scale = {zero = false}, axis = { grid = false} }
-            ) + @vlplot(
+                x = {:predicted, type = :quantitative, scale = {zero = false}, axis = { grid = false} },
+                y = {:sqrtstudent, type = :quantitative, title = "√student", 
+                    scale = {zero = false}, axis = { grid = false} }) + @vlplot(
                 transform = [ { loess = :sqrtstudent, on = :predicted, bandwidth = 0.6 } ],
                 mark = {:line, color = "firebrick"},
-                x = :predicted, y = :sqrtstudent
-            )
-    return p 
+                x = {:predicted, type = :quantitative}, y = {:sqrtstudent, type = :quantitative} )
+    all_plots["scale location"] = p
 end
 
-function leverage_plot(results, lm, plot_args)
+function leverage_plot!(all_plots, results, lm, plot_args)
     threshold_leverage = 2 * lm.p / lm.observations
     plot_width = plot_args["plot_width"]
     p = select(results, [:leverage, :rstudent]) |> 
         @vlplot(title = "Leverage vs Rstudent", width = plot_width, height = plot_width,
             x = {axis = {grid = false}}, y = {axis = {grid = false}}   ) +
-        @vlplot(:point, :leverage, :rstudent) +
+        @vlplot(:point, 
+            x = {:leverage, type = :quantitative},
+            y = {:rstudent, type = :quantitative}) +
         @vlplot(mark = {:rule, color = :darkgrey}, y = {datum = -2}) +
         @vlplot(mark = {:rule, color = :darkgrey}, x = {datum = threshold_leverage}) +
         @vlplot(mark = {:rule, color = :darkgrey}, y = {datum = 2}) 
-    return p
+    all_plots["leverage"] = p
 end
 

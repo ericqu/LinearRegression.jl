@@ -122,8 +122,11 @@ See [reference implementation](https://github.com/mcreel/Econometrics/blob/508ae
 
 ## Functions
 ```@docs
-regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame; α::Float64=0.05, req_stats=["all"], remove_missing=false, cov=[:none])
-predict_in_sample(lr::linRegRes, df::DataFrames.DataFrame; α=0.05, req_stats=["none"])
+function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame, req_plots; α::Float64=0.05, req_stats=["all"], remove_missing=false, cov=[:none], contrasts=nothing, plot_args=Dict("plot_width" => 400 , "loess_bw"=> 0.6))
+function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame; α::Float64=0.05, req_stats=["default"], weights::Union{Nothing, String}=nothing,
+                remove_missing=false, cov=[:none], contrasts=nothing, normality_test=false)
+predict_in_sample(lr::linRegRes, df::DataFrames.DataFrame; α=0.05, req_stats=["none"], dropmissingvalues = true)
+predict_out_of_sample(lr::linRegRes, df::DataFrames.DataFrame; α=0.05, req_stats=["none"], dropmissingvalues = true)
 ```
 
 ## Index
