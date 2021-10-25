@@ -173,7 +173,48 @@ x ^ 3         │     1.04075    0.0151001      68.9236  1.77641e-85      1.0107
 ```
 ![Overview Plots](https://github.com/ericqu/LinearRegression.jl/raw/main/assets/asset_exe_072_02.svg "Overview Plots")
 
-While this is not interesting for this dataset, we can still request some robust covariance estimators in this way:
+Further, in addition to the diagnostic plots helping confirm if the residuals are normally distributed, a few tests can be requested:
+
+```julia
+# Data simulation
+f(x) = @. (x^3 + 2.2345x - 1.2345 + rand(Uniform(0, 20)))
+xs = [x for x in -2:0.001:8]
+ys = f(xs)
+vdf = DataFrame(y=ys, x=xs)
+
+lr = regress(@formula(y ~ 1 + x^3 ), vdf, 
+    req_stats=["default", "vif", "AIC", "diag_normality"])
+```
+Giving:
+```
+Model definition:       y ~ 1 + :(x ^ 3)
+Used observations:      10001
+Model statistics:
+  R²: 0.997951                  Adjusted R²: 0.997951
+  MSE: 43.4392                  RMSE: 6.59084
+  σ̂²: 43.4392                   AIC: 37719.4
+Confidence interval: 95%
+
+Coefficients statistics:
+Terms ╲ Stats │       Coefs      Std err            t     Pr(>|t|)       low ci      high ci          VIF
+──────────────┼──────────────────────────────────────────────────────────────────────────────────────────
+(Intercept)   │     11.3151    0.0815719      138.714          0.0      11.1552       11.475          0.0
+x ^ 3         │     1.03984  0.000471181      2206.87          0.0      1.03892      1.04076          1.0
+
+Diagnostic Tests:
+
+Kolmogorov-Smirnov test (Normality of residuals):
+  KS statistic: 3.47709    observations: 10001    p-value: 0.0
+  with 95.0% confidence: reject null hyposthesis.
+Anderson–Darling test (Normality of residuals):
+  A² statistic: 24.924901    observations: 10001    p-value: 0.0
+  with 95.0% confidence: reject null hyposthesis.
+Jarque-Bera test (Normality of residuals):
+  JB statistic: 241.764504    observations: 10001    p-value: 0.0
+  with 95.0% confidence: reject null hyposthesis.
+```
+
+Here is how to request the robust covariance estimators:
 
 ```julia 
 lr = regress(@formula(y ~ 1 + x^3 ), vdf, cov=["white", "nw"])
@@ -243,5 +284,5 @@ x             │ 0.0853571   0.244924   0.348505   0.736455  -0.479438   0.6501
 - The function to predict values have been renamed. Now there is a function to predict in-sample values and one to predict out-of-sample values.
 - It is possible to generate, through Vega-lite, some plot about the regression being studied.
 - "contrasts" following the same syntax as GLM can be passed as a parameter to the ```regress``` function
-- it is possible to request some test about normality of the residuals and heteroscedasticity (this relies on the HypothesisTests package)
-- The documentation is started
+- It is possible to request some test about normality of the residuals and heteroscedasticity (this relies on the HypothesisTests package)
+
