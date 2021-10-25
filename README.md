@@ -144,105 +144,65 @@ This is pretty good, so let's further review some diagnostic plots.
 [[ps["fit"] ps["residuals"]]
     [ps["histogram density"] ps["qq plot"]]]
 ```
-![Predicted vs actual model 1](https://github.com/ericqu/LinearRegression.jl/raw/main/assets/asset_exe_001.svg "Predicted vs actual model 1")
+![Overview Plots (https://raw.githubusercontent.com/ericqu/LinearRegression.jl/main/assets/asset_exe_072_01.svg "Overview Plots")
 
+Please note that for the fit plot, the orange line shows the regression line, in dark grey the confidence interval for the mean, and in light grey the interval for the individuals predictions.
 
-```julia
-select(results, [:predicted, :residuals]) |> 
-        @vlplot(title = "Predicted vs residuals", width = 400, height = 400, x = {axis = {grid = false}}, y = {axis = {grid = false}}   ) +
-        @vlplot(:point, :predicted, :residuals) +
-        @vlplot(mark = {:rule, color = :darkgrey}, y = {datum = 0})
-```
-
-![Predicted vs residuals model 1](https://github.com/ericqu/LinearRegression.jl/raw/main/assets/asset_exe_002.svg "Predicted vs residuals model 1")
-
-Both plots are indicating the potential presence of a polynomial component. Hence one might try to add one by doing the following:
+Plots are indicating the potential presence of a polynomial component. Hence one might try to add one by doing the following:
 
 ```julia 
-lr = regress(@formula(y ~ 1 + x + x^2 ), vdf)
+lr, ps = regress(@formula(y ~ 1 + x^3 ), vdf, "all", 
+    req_stats=["default", "vif", "AIC"], 
+    plot_args=Dict("plot_width" => 200 ))
 ```
 Giving:
 ```
-Model definition:  y ~ 1 + x + :(x ^ 2)
+Model definition:       y ~ 1 + :(x ^ 3)
 Used observations:      101
 Model statistics:
-  R²: 0.982048                  Adjusted R²: 0.981681
-  MSE: 408.574                  RMSE: 20.2132
-  σ̂²: 408.574                   AIC: 610.235
+  R²: 0.979585                  Adjusted R²: 0.979379
+  MSE: 466.724                  RMSE: 21.6038
+  σ̂²: 466.724                   AIC: 622.699
 Confidence interval: 95%
+
 Coefficients statistics:
 Terms ╲ Stats │       Coefs      Std err            t     Pr(>|t|)       low ci      high ci          VIF
 ──────────────┼──────────────────────────────────────────────────────────────────────────────────────────
-(Intercept)   │     -20.377      2.88895     -7.05342  2.49191e-10       -26.11      -14.644          0.0
-x             │    -9.20267      1.73096     -5.31652   6.65925e-7     -12.6377     -5.76764      6.29568
-x ^ 2         │     8.99074     0.264591      33.9798  5.00484e-56      8.46566      9.51581      6.29568
+(Intercept)   │     1.23626      2.65774     0.465157     0.642841     -4.03726      6.50979          0.0
+x ^ 3         │     1.04075    0.0151001      68.9236  1.77641e-85      1.01079      1.07071          1.0
 ```
-Which aside from the slightly high VIF does not indicate anything wrong. 
-Lets look at the updated "predicted vs residuals" plots (same code used):
+ 
+Lets look at the updated plots:
+![Overview Plots (https://raw.githubusercontent.com/ericqu/LinearRegression.jl/main/assets/asset_exe_072_02.svg "Overview Plots")
 
-![Predicted vs residuals model 2](https://github.com/ericqu/LinearRegression.jl/raw/main/assets/asset_exe_003.svg "Predicted vs residuals model 2")
-
-Which still shows a strong pattern. To shorten the analysis, we can add the cubic component in the model:
+While this is not interesting for this dataset, we can still request some robust covariance estimators in this way:
 
 ```julia 
-lr = regress(@formula(y ~ 1 + x + x^3 ), vdf)
+lr = regress(@formula(y ~ 1 + x^3 ), vdf, 
+    req_stats=["default", "vif", "AIC"], cov=["white", "nw"])
 ```
 Giving:
 ```
-Model definition:  y ~ 1 + x + :(x ^ 3)
+Model definition:       y ~ 1 + :(x ^ 3)
 Used observations:      101
 Model statistics:
-  R²: 0.999623                  Adjusted R²: 0.999615
-  MSE: 8.58223                  RMSE: 2.92954
-  σ̂²: 8.58223                   AIC: 220.074
+  R²: 0.979585                  Adjusted R²: 0.979379
+  MSE: 466.724                  RMSE: 21.6038
 Confidence interval: 95%
-Coefficients statistics:
-Terms ╲ Stats │        Coefs       Std err             t      Pr(>|t|)        low ci       high ci           VIF
-──────────────┼─────────────────────────────────────────────────────────────────────────────────────────────────
-(Intercept)   │     -1.47862       0.42911      -3.44578   0.000839903      -2.33018     -0.627064           0.0
-x             │      2.44422      0.200118       12.2139   2.11167e-21       2.04709       2.84134       4.00602
-x ^ 3         │     0.999989    0.00409832       243.999  2.99597e-138      0.991856       1.00812       4.00602
-```
-And the following Predicted vs Residuals plots:
 
-![Predicted vs residuals model 3](https://github.com/ericqu/LinearRegression.jl/raw/main/assets/asset_exe_004.svg "Predicted vs residuals model 3")
+White's covariance estimator (HC3):
+Terms ╲ Stats │       Coefs      Std err            t     Pr(>|t|)       low ci      high ci
+──────────────┼─────────────────────────────────────────────────────────────────────────────
+(Intercept)   │     1.23626      2.66559     0.463785      0.64382     -4.05285      6.52538
+x ^ 3         │     1.04075    0.0145322      71.6169  4.30034e-87      1.01192      1.06959
 
-Which this time show residuals scatters without an obvious pattern, potentially showing the Normal error component of the model.
-
-Without surprise, the "Predicted vs actual" plot now shows a linear relationship. 
-
-![Predicted vs actual](https://github.com/ericqu/LinearRegression.jl/raw/main/assets/asset_exe_005.svg "Predicted vs actual, model 3")
-
-Additional plots can be used to find outliers of interest, such as Leverage vs Rstudent (or studentized residual with the current observation deleted) and the Cook's Distance.
-
-```julia
-threshold_leverage = 2 * lr.p / lr.observations
-select(results, [:leverage, :rstudent]) |> 
-    @vlplot(title = "Leverage vs Rstudent", width = 400, height = 400,
-        x = {axis = {grid= false}}, y = {axis = {grid= false}}   ) +
-    @vlplot(:point, :leverage, :rstudent) +
-    @vlplot(mark = {:rule, color = :darkgrey}, y = {datum = -2}) +
-    @vlplot(mark = {:rule, color = :darkgrey}, x = {datum = threshold_leverage}) +
-    @vlplot(mark = {:rule, color = :darkgrey}, y = {datum = 2}) 
-
-threshold_cooksd = 4 / lr.observations
-select(results, [:x, :cooksd]) |> 
-    @vlplot(title = "x vs Cook's Distance", width = 400, height = 200) +
-    @vlplot(
-        mark={:rule, color = :steelblue},
-        enc =
-        {
-            x = {:x, type = :quantitative, axis = {grid = false}},
-            y = {datum = 0} ,
-            y2 = :cooksd
-        }
-        ) +
-    @vlplot(mark = {:rule, color = :darkgrey}, y = {datum = threshold_cooksd})  
+Newey-West's covariance estimator:
+Terms ╲ Stats │       Coefs      Std err            t     Pr(>|t|)       low ci      high ci
+──────────────┼─────────────────────────────────────────────────────────────────────────────
+(Intercept)   │     1.23626       2.4218     0.510472     0.610857     -3.56912      6.04165
+x ^ 3         │     1.04075    0.0129463      80.3897  5.60424e-92      1.01506      1.06644
 ```
 
-![Leverage vs RStudent](https://github.com/ericqu/LinearRegression.jl/raw/main/assets/asset_exe_006.svg "Leverage vs RStudent")
-
-![x vs Cook's distance](https://github.com/ericqu/LinearRegression.jl/raw/main/assets/asset_exe_007.svg "x vs Cook's distance")
 
 ## Notable changes since last version
 - Addition of weighted regression.
