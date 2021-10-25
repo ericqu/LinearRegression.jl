@@ -39,7 +39,7 @@ end
             3.0 12.4  0.073 
             5.4 12.9  0.035 
             6.4 14.0  0
-        ]
+        ] # data from https://blogs.sas.com/content/iml/2016/10/05/weighted-regression.html
         
         df = DataFrame(tw, [:y,:x,:w])
         f = @formula(y ~ 0 + x)
