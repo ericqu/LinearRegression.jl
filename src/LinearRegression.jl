@@ -63,8 +63,8 @@ struct linRegRes
     JB_test::Union{Nothing,String}          # Store results of the Jarque-Bera test
     White_test::Union{Nothing,String}       # Store results of the White test
     BP_test::Union{Nothing,String}          # Store results of the Breusch-Pagan test
-    weighted::Bool                          # Indicates if is a weighted regression
-    weights::Union{Nothing,String}          # the column containing the analytical weights
+    weighted::Bool                          # Indicates if this is a weighted regression
+    weights::Union{Nothing,String}          # Indicates which column of the dataframe contains the analytical weights
 end
 
 """
@@ -116,8 +116,8 @@ function Base.show(io::IO, lr::linRegRes)
     if length(lr.white_types) > 0
         for (cur_i, cur_type) in enumerate(lr.white_types)
             helper_print_table(io, "White's covariance estimator ($(Base.Unicode.uppercase(string(cur_type)))):", 
-                [lr.coefs, lr.white_stderrors[cur_i], lr.white_t_values[cur_i], lr.white_p_values[cur_i], lr.white_ci_low[cur_i], lr.white_ci_up[cur_i] ],
-                ["Coefs", "Std err", "t", "Pr(>|t|)", "low ci", "high ci"], 
+                [lr.coefs, lr.white_stderrors[cur_i], lr.white_t_values[cur_i], lr.white_p_values[cur_i], lr.white_ci_low[cur_i], lr.white_ci_up[cur_i], lr.VIF ],
+                ["Coefs", "Std err", "t", "Pr(>|t|)", "low ci", "high ci", "VIF"], 
                 lr.updformula)
         end
     end
@@ -125,29 +125,19 @@ function Base.show(io::IO, lr::linRegRes)
     if length(lr.hac_types) > 0
         for (cur_i, cur_type) in enumerate(lr.hac_types)
             helper_print_table(io, "Newey-West's covariance estimator:", 
-                [lr.coefs, lr.hac_stderrors[cur_i], lr.hac_t_values[cur_i], lr.hac_p_values[cur_i], lr.hac_ci_low[cur_i], lr.hac_ci_up[cur_i] ],
-                ["Coefs", "Std err", "t", "Pr(>|t|)", "low ci", "high ci"], 
+                [lr.coefs, lr.hac_stderrors[cur_i], lr.hac_t_values[cur_i], lr.hac_p_values[cur_i], lr.hac_ci_low[cur_i], lr.hac_ci_up[cur_i], lr.VIF],
+                ["Coefs", "Std err", "t", "Pr(>|t|)", "low ci", "high ci", "VIF"], 
                 lr.updformula)
         end
     end
 
     if !isnothing(lr.KS_test) || !isnothing(lr.AD_test) || !isnothing(lr.JB_test) || !isnothing(lr.White_test) || !isnothing(lr.BP_test)
         println(io, "\nDiagnostic Tests:\n")
-        if !isnothing(lr.KS_test)
-            print(io, lr.KS_test)
-        end
-        if !isnothing(lr.AD_test)
-            print(io, lr.AD_test)
-        end
-        if !isnothing(lr.JB_test)
-            print(io, lr.JB_test)
-        end
-        if !isnothing(lr.White_test)
-            print(io, lr.White_test)
-        end
-        if !isnothing(lr.BP_test)
-            print(io, lr.BP_test)
-        end
+        !isnothing(lr.KS_test) && print(io, lr.KS_test)
+        !isnothing(lr.AD_test) && print(io, lr.AD_test)
+        !isnothing(lr.JB_test) && print(io, lr.JB_test)
+        !isnothing(lr.White_test) && print(io, lr.White_test)
+        !isnothing(lr.BP_test) && print(io, lr.BP_test)
     end    
 end
 
@@ -250,7 +240,11 @@ end
     weights::Union{Nothing,String}=nothing, remove_missing=false, cov=[:none], contrasts=nothing, 
     plot_args=Dict("plot_width" => 400, "loess_bw" => 0.6, "residuals_with_density" => false))
 
-Estimate the coefficients of the regression, given a dataset and a formula. and provide the requested plot(s).
+    Estimate the coefficients of the regression, given a dataset and a formula. and provide the requested plot(s).
+    A dictionary of the generated plots indexed by the descritption of the plots.
+
+    It is possible to indicate the width of the plots, and the bandwidth of the Loess smoother.
+
 """
 function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame, req_plots; α::Float64=0.05, req_stats=["default"],
                 weights::Union{Nothing,String}=nothing, remove_missing=false, cov=[:none], contrasts=nothing, 
