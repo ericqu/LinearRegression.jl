@@ -20,28 +20,37 @@ function fitplot!(all_plots, results, lm, plot_args)
     acty = first(lhs).sym
     acttitle = "Fit Plot: " * string(actx) * " vs " * string(acty)
 
-    fp = select(results, [actx, acty, :ucli, :lcli, :uclp, :lclp, :predicted]) |> @vlplot(
-        layer = [
-            {   mark = {:errorband, color = "lightgrey" },
+    pred_interval = @vlplot(
+            mark = {:errorband, color = "lightgrey"},
+            y = { field = :ucli, type = :quantitative, title = acty} ,
+            y2 = { field = :lcli, type = :quantitative }, 
+            x = {actx, type = :quantitative})
+    if lm.weighted
+        pred_interval = @vlplot(
+                mark = {:errorbar, ticks=true, color = "dimgrey"},
                 y = { field = :ucli, type = :quantitative, title = acty} ,
                 y2 = { field = :lcli, type = :quantitative }, 
-                x = {actx, type = :quantitative}, 
-            },
-            {   mark = {:errorband, color = "darkgrey" },
-                y = { field = :uclp, type = :quantitative, title = acty}, 
-                y2 = { field = :lclp, type = :quantitative }, 
-                x = {actx, type = :quantitative}, 
-            },
-            {   mark = { :line, color = "darkorange" },
-                x = {actx, type = :quantitative},
-                y = {:predicted, type = :quantitative}
-            },
-            {   :point, 
-                x = { actx, type = :quantitative, axis = {grid = false}, scale = {zero = false}},
-                y = { acty, type = :quantitative, axis = {grid = false}, scale = {zero = false}},
-                title = acttitle, width = plot_args["plot_width"], height = plot_args["plot_width"]
-            },
-        ])
+                x = {actx, type = :quantitative})
+    end
+
+    fp = select(results, [actx, acty, :ucli, :lcli, :uclp, :lclp, :predicted]) |> @vlplot() + 
+        pred_interval+ 
+        @vlplot(
+            mark = {:errorband, color = "darkgrey" },
+            y = { field = :uclp, type = :quantitative, title = acty}, 
+            y2 = { field = :lclp, type = :quantitative }, 
+            x = {actx, type = :quantitative} ) + 
+        @vlplot(
+            mark = { :line, color = "darkorange" },
+            x = {actx, type = :quantitative},
+            y = {:predicted, type = :quantitative}) +
+        @vlplot(
+            :point, 
+            x = { actx, type = :quantitative, axis = {grid = false}, scale = {zero = false}},
+            y = { acty, type = :quantitative, axis = {grid = false}, scale = {zero = false}},
+            title = acttitle, width = plot_args["plot_width"], height = plot_args["plot_width"]
+        )
+
     all_plots["fit"] = fp
 end
 

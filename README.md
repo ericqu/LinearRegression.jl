@@ -241,6 +241,52 @@ Terms ╲ Stats │       Coefs      Std err            t     Pr(>|t|)       low
 x ^ 3         │     1.04075    0.0129463      80.3897  5.60424e-92      1.01506      1.06644
 ```
 
+Finally, to perform a weighted regression (through weighted least squares) with analytical weights,
+one can use the ```weights``` argument. The regression summary will then indicate that it is
+a weighted regression, and the fit plot will present the prediction interval with error bars rather than a ribbon.
+
+Here is a short example:
+```julia 
+    tw = [
+        2.3  7.4  0.058 
+        3.0  7.6  0.073 
+        2.9  8.2  0.114 
+        4.8  9.0  0.144 
+        1.3 10.4  0.151 
+        3.6 11.7  0.119 
+        2.3 11.7  0.119 
+        4.6 11.8  0.114 
+        3.0 12.4  0.073 
+        5.4 12.9  0.035 
+        6.4 14.0  0
+    ] # data from https://blogs.sas.com/content/iml/2016/10/05/weighted-regression.html
+    
+    df = DataFrame(tw, [:y,:x,:w])
+    f = @formula(y ~ x)
+    lm, ps= regress(f, df, "fit", weights="w")
+```
+
+Giving:
+
+```
+Model definition:      y ~ 1 + x
+Used observations:      3
+Weighted regression
+Model statistics:
+  R²: 0.96                      Adjusted R²: 0.92
+  MSE: 0.48                     RMSE: 0.69282
+  σ̂²: 0.48
+Confidence interval: 95%
+
+Coefficients statistics:
+Terms ╲ Stats │     Coefs    Std err          t   Pr(>|t|)     low ci    high ci
+──────────────┼─────────────────────────────────────────────────────────────────
+(Intercept)   │      -0.2    0.69282  -0.288675   0.821088   -9.00312    8.60312
+x             │      1.44   0.293939    4.89898   0.128188   -2.29485    5.17485
+```
+
+![Fit Plot](https://github.com/ericqu/LinearRegression.jl/raw/main/assets/asset_exe_072_03.svg "Fit Plot")
+
 
 ## Notable changes since last version
 - Addition of weighted regression.
@@ -248,4 +294,3 @@ x ^ 3         │     1.04075    0.0129463      80.3897  5.60424e-92      1.0150
 - It is possible to generate, through Vega-lite, some plot about the regression being studied.
 - "contrasts" following the same syntax as GLM can be passed as a parameter to the ```regress``` function
 - It is possible to request some test about normality of the residuals and heteroscedasticity (this relies on the HypothesisTests package)
-
