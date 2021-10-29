@@ -58,12 +58,13 @@ struct linRegRes
     dataschema                              # Store the dataschema
     updformula                              # Store the updated model formula (after the dataschema has been applied)
     alpha                                   # Store the alpha used to compute the confidence interval of the coefficients
-    KS_test::Union{Nothing,String}         # Store results of the Kolmogorov-Smirnov test
-    AD_test::Union{Nothing,String}         # Store results of the Anderson–Darling test
-    JB_test::Union{Nothing,String}         # Store results of the Jarque-Bera test
-    White_test::Union{Nothing,String}      # Store results of the White test
-    BP_test::Union{Nothing,String}         # Store results of the Breusch-Pagan test
+    KS_test::Union{Nothing,String}          # Store results of the Kolmogorov-Smirnov test
+    AD_test::Union{Nothing,String}          # Store results of the Anderson–Darling test
+    JB_test::Union{Nothing,String}          # Store results of the Jarque-Bera test
+    White_test::Union{Nothing,String}       # Store results of the White test
+    BP_test::Union{Nothing,String}          # Store results of the Breusch-Pagan test
     weighted::Bool                          # Indicates if is a weighted regression
+    weights::Union{Nothing,String}          # the column containing the analytical weights
 end
 
 """
@@ -261,10 +262,10 @@ function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame, req_plots
                 contrasts=contrasts, weights=weights)
     results = predict_in_sample(lm, df, req_stats="all")
 
-    if :fitplot in neededplots
+    if :fit in neededplots
         fitplot!(all_plots, results, lm, plot_args)
     end
-    if :residuals_plots in neededplots
+    if :residuals in neededplots
         residuals_plots!(all_plots, results, lm, plot_args)
     end
     if :normal_checks in neededplots
@@ -317,8 +318,8 @@ function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame; α::Float
                 copieddf[!, weights] = df[!, weights]
             end
             allowmissing!(copieddf, weights)
-            df[!, weights][df[!, weights] .<= 0] .= missing
-            dropmissing!(df)
+            copieddf[!, weights][copieddf[!, weights] .<= 0] .= missing
+            dropmissing!(copieddf)
         end
     end
     isweighted = !isnothing(weights)
@@ -524,7 +525,7 @@ function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame; α::Float
         n, get(scalar_stats, :t_statistic, nothing), get(vector_stats, :vif, nothing), f, dataschema, updatedformula, α,
         get(diag_stats, :diag_ks, nothing), get(diag_stats, :diag_ad, nothing), get(diag_stats, :diag_jb, nothing),
         get(diag_stats, :diag_white, nothing),  get(diag_stats, :diag_bp, nothing),
-        isweighted
+        isweighted, weights
         )
     
     return sres
@@ -606,8 +607,12 @@ function predict_out_of_sample(lr::linRegRes, df::DataFrames.DataFrame; α=0.05,
         needed_stats[sym] = zeros(length(n))
     end
     if :leverage in needed
-        @show(x)
-        needed_stats[:leverage] = diag(x * inv(x'x) * x')
+        pinverse = @view(lr.extended_inverse[1:end - 1, 1:end - 1])
+        if lr.weighted
+            needed_stats[:leverage] = copieddf[!, lr.weights] .* diag(x * pinverse * x')
+        else
+            needed_stats[:leverage] = diag(x * pinverse * x')
+        end
     end
     if :predicted in needed
         needed_stats[:predicted] = lr_predict(x, lr.coefs, lr.intercept)
@@ -616,51 +621,49 @@ function predict_out_of_sample(lr::linRegRes, df::DataFrames.DataFrame; α=0.05,
         if isnothing(lr.σ̂²)
             throw(ArgumentError(":stdp requires that the σ̂² (:sigma) was previously calculated through the regression"))
         end
-        if length(lr.white_types) + length(lr.hac_types) > 0
-            println(io, "The STDP statistic that relies on Sigma^2 has been requested. At least one robust covariance have been requested indicating that the assumptions needed for Sigma^2 may not be present.")
+        warn_sigma(lr, :stdp)
+        if lr.weighted
+            needed_stats[:stdp] = sqrt.(needed_stats[:leverage] .* lr.σ̂² ./ copieddf[!, lr.weights])
+        else
+            needed_stats[:stdp] = sqrt.(needed_stats[:leverage] .* lr.σ̂²)
         end
-        needed_stats[:stdp] = sqrt.(needed_stats[:leverage] .* lr.σ̂²)
     end
     if :stdi in needed
         if isnothing(lr.σ̂²)
             throw(ArgumentError(":stdi requires that the σ̂² (:sigma) was previously calculated through the regression"))
         end
-        if length(lr.white_types) + length(lr.hac_types) > 0
-            println(io, "The STDI statistic that relies on Sigma^2 has been requested. At least one robust covariance have been requested indicating that the assumptions needed for Sigma^2 may not be present.")
+        warn_sigma(lr, :stdi)
+        if lr.weighted
+            needed_stats[:stdi] = sqrt.((1. .+ needed_stats[:leverage]) .* lr.σ̂² ./ copieddf[!, lr.weights])
+        else
+            needed_stats[:stdi] = sqrt.((1. .+ needed_stats[:leverage]) .* lr.σ̂²)
         end
-        needed_stats[:stdi] = sqrt.((1. .+ needed_stats[:leverage]) .* lr.σ̂²)
     end
     if :stdr in needed
         if isnothing(lr.σ̂²)
             throw(ArgumentError(":stdr requires that the σ̂² (:sigma) was previously calculated through the regression"))
         end
-        if length(lr.white_types) + length(lr.hac_types) > 0
-            println(io, "The STDR statistic that relies on Sigma^2 has been requested. At least one robust covariance have been requested indicating that the assumptions needed for Sigma^2 may not be present.")
+        warn_sigma(lr, :stdr)
+        if lr.weighted
+            needed_stats[:stdr] = sqrt.((1. .- needed_stats[:leverage]) .* lr.σ̂² ./ copieddf[!, lr.weights] )
+        else
+            needed_stats[:stdr] = sqrt.((1. .- needed_stats[:leverage]) .* lr.σ̂²)
         end
-        needed_stats[:stdr] = sqrt.((1. .- needed_stats[:leverage]) .* lr.σ̂²)
     end
     if :lcli in needed
-        if length(lr.white_types) + length(lr.hac_types) > 0
-            println(io, "The LCLI statistic that relies on Sigma^2 has been requested. At least one robust covariance have been requested indicating that the assumptions needed for Sigma^2 may not be present.")
-        end
+        warn_sigma(lr, :lcli)
         needed_stats[:lcli] = needed_stats[:predicted] .- (lr.t_statistic .* needed_stats[:stdi])
     end
     if :ucli in needed
-        if length(lr.white_types) + length(lr.hac_types) > 0
-            println(io, "The UCLI statistic that relies on Sigma^2 has been requested. At least one robust covariance have been requested indicating that the assumptions needed for Sigma^2 may not be present.")
-        end
+        warn_sigma(lr, :ucli)
         needed_stats[:ucli] = needed_stats[:predicted] .+ (lr.t_statistic .* needed_stats[:stdi])
     end
     if :lclp in needed
-        if length(lr.white_types) + length(lr.hac_types) > 0
-            println(io, "The LCLP statistic that relies on Sigma^2 has been requested. At least one robust covariance have been requested indicating that the assumptions needed for Sigma^2 may not be present.")
-        end
+        warn_sigma(lr, :lclp)
         needed_stats[:lclp] = needed_stats[:predicted] .- (lr.t_statistic .* needed_stats[:stdp])
     end
     if :uclp in needed
-        if length(lr.white_types) + length(lr.hac_types) > 0
-            println(io, "The UCLP statistic that relies on Sigma^2 has been requested. At least one robust covariance have been requested indicating that the assumptions needed for Sigma^2 may not be present.")
-        end
+        warn_sigma(lr, :uclp)
         needed_stats[:uclp] = needed_stats[:predicted] .+ (lr.t_statistic .* needed_stats[:stdp])
     end
 
@@ -682,7 +685,19 @@ function predict_in_sample(lr::linRegRes, df::DataFrames.DataFrame; α=0.05, req
 
     copieddf = df[: , Symbol.(keys(schema(lr.modelformula, df).schema))]
     if dropmissingvalues == true
-    dropmissing!(copieddf)
+        dropmissing!(copieddf)
+    end
+
+    if lr.weighted
+        if !in(Symbol(lr.weights), propertynames(df))
+            println(io, "Weights have been specified being the column $(lr.weights) however such colum does not exist in the dataframe provided. Regression will be done without weights")
+            weights = nothing
+        else
+            copieddf[!, lr.weights] = df[!, lr.weights]
+            allowmissing!(copieddf, lr.weights)
+            copieddf[!, lr.weights][copieddf[!, lr.weights] .<= 0] .= missing
+            dropmissing!(copieddf)
+        end
     end
     dataschema = schema(lr.modelformula, copieddf)
     updatedformula = apply_schema(lr.modelformula, dataschema)
@@ -695,7 +710,12 @@ function predict_in_sample(lr::linRegRes, df::DataFrames.DataFrame; α=0.05, req
         needed_stats[sym] = zeros(length(n))
     end
     if :leverage in needed
-        needed_stats[:leverage] = diag(x * inv(x'x) * x')
+        pinverse = @view(lr.extended_inverse[1:end - 1, 1:end - 1])
+        if lr.weighted
+            needed_stats[:leverage] = copieddf[!, lr.weights] .* diag(x * pinverse * x')
+        else
+            needed_stats[:leverage] = diag(x * pinverse * x')
+        end
     end
     if :predicted in needed
         needed_stats[:predicted] = lr_predict(x, lr.coefs, lr.intercept)
@@ -703,80 +723,72 @@ function predict_in_sample(lr::linRegRes, df::DataFrames.DataFrame; α=0.05, req
     if :residuals in needed
         needed_stats[:residuals] = y .- needed_stats[:predicted]
     end
-        if :stdp in needed
+    if :stdp in needed
         if isnothing(lr.σ̂²)
             throw(ArgumentError(":stdp requires that the σ̂² (:sigma) was previously calculated through the regression"))
         end
-        if length(lr.white_types) + length(lr.hac_types) > 0
-            println(io, "The STDP statistic that relies on Sigma^2 has been requested. At least one robust covariance have been requested indicating that the assumptions needed for Sigma^2 may not be present.")
+        warn_sigma(lr, :stdp)
+        if lr.weighted
+            needed_stats[:stdp] = sqrt.(needed_stats[:leverage] .* lr.σ̂² ./ copieddf[!, lr.weights])
+        else
+            needed_stats[:stdp] = sqrt.(needed_stats[:leverage] .* lr.σ̂²)
         end
-        needed_stats[:stdp] = sqrt.(needed_stats[:leverage] .* lr.σ̂²)
     end
-        if :stdi in needed
+    if :stdi in needed
         if isnothing(lr.σ̂²)
             throw(ArgumentError(":stdi requires that the σ̂² (:sigma) was previously calculated through the regression"))
         end
-        if length(lr.white_types) + length(lr.hac_types) > 0
-            println(io, "The STDI statistic that relies on Sigma^2 has been requested. At least one robust covariance have been requested indicating that the assumptions needed for Sigma^2 may not be present.")
+        warn_sigma(lr, :stdi)
+        if lr.weighted
+            needed_stats[:stdi] = sqrt.((1. .+ needed_stats[:leverage]) .* lr.σ̂² ./ copieddf[!, lr.weights])
+        else
+            needed_stats[:stdi] = sqrt.((1. .+ needed_stats[:leverage]) .* lr.σ̂²)
         end
-        needed_stats[:stdi] = sqrt.((1. .+ needed_stats[:leverage]) .* lr.σ̂²)
     end
-        if :stdr in needed
+    if :stdr in needed
         if isnothing(lr.σ̂²)
             throw(ArgumentError(":stdr requires that the σ̂² (:sigma) was previously calculated through the regression"))
         end
-        if length(lr.white_types) + length(lr.hac_types) > 0
-            println(io, "The STDR statistic that relies on Sigma^2 has been requested. At least one robust covariance have been requested indicating that the assumptions needed for Sigma^2 may not be present.")
+        warn_sigma(lr, :stdr)
+        if lr.weighted
+            needed_stats[:stdr] = sqrt.((1. .- needed_stats[:leverage]) .* lr.σ̂² ./ copieddf[!, lr.weights] )
+        else
+            needed_stats[:stdr] = sqrt.((1. .- needed_stats[:leverage]) .* lr.σ̂²)
         end
-        needed_stats[:stdr] = sqrt.((1. .- needed_stats[:leverage]) .* lr.σ̂²)
     end
     if :student in needed
-        if length(lr.white_types) + length(lr.hac_types) > 0
-            println(io, "The student statistic that relies on Sigma^2 has been requested. At least one robust covariance have been requested indicating that the assumptions needed for Sigma^2 may not be present.")
-        end
+        warn_sigma(lr, :student)
         needed_stats[:student] = needed_stats[:residuals] ./ needed_stats[:stdr]
     end
     if :rstudent in needed
-        if length(lr.white_types) + length(lr.hac_types) > 0
-            println(io, "The rstudent statistic that relies on Sigma^2 has been requested. At least one robust covariance have been requested indicating that the assumptions needed for Sigma^2 may not be present.")
-        end
+        warn_sigma(lr, :rstudent)
         needed_stats[:rstudent] = needed_stats[:student] .* real.(sqrt.(complex.((n .- p .- 1 ) ./ (n .- p .- needed_stats[:student].^2 ), 0)))
     end
-        if :lcli in needed
-        if length(lr.white_types) + length(lr.hac_types) > 0
-            println(io, "The LCLI statistic that relies on Sigma^2 has been requested. At least one robust covariance have been requested indicating that the assumptions needed for Sigma^2 may not be present.")
-        end
+    if :lcli in needed
+        warn_sigma(lr, :lcli)
         needed_stats[:lcli] = needed_stats[:predicted] .- (lr.t_statistic .* needed_stats[:stdi])
     end
-        if :ucli in needed
-        if length(lr.white_types) + length(lr.hac_types) > 0
-            println(io, "The UCLI statistic that relies on Sigma^2 has been requested. At least one robust covariance have been requested indicating that the assumptions needed for Sigma^2 may not be present.")
-        end
+    if :ucli in needed
+        warn_sigma(lr, :ucli)
         needed_stats[:ucli] = needed_stats[:predicted] .+ (lr.t_statistic .* needed_stats[:stdi])
     end
-        if :lclp in needed
-        if length(lr.white_types) + length(lr.hac_types) > 0
-            println(io, "The LCLP statistic that relies on Sigma^2 has been requested. At least one robust covariance have been requested indicating that the assumptions needed for Sigma^2 may not be present.")
-        end
+    if :lclp in needed
+        warn_sigma(lr, :lclp)
         needed_stats[:lclp] = needed_stats[:predicted] .- (lr.t_statistic .* needed_stats[:stdp])
     end
-        if :uclp in needed
-        if length(lr.white_types) + length(lr.hac_types) > 0
-            println(io, "The UCLP statistic that relies on Sigma^2 has been requested. At least one robust covariance have been requested indicating that the assumptions needed for Sigma^2 may not be present.")
-        end
+    if :uclp in needed
+        warn_sigma(lr, :uclp)
         needed_stats[:uclp] = needed_stats[:predicted] .+ (lr.t_statistic .* needed_stats[:stdp])
     end
     if :press in needed
         needed_stats[:press] = needed_stats[:residuals] ./ (1. .- needed_stats[:leverage])
     end
     if :cooksd in needed
-        if length(lr.white_types) + length(lr.hac_types) > 0
-            println(io, "The CooksD statistic that relies on Sigma^2 has been requested. At least one robust covariance have been requested indicating that the assumptions needed for Sigma^2 may not be present.")
-        end
+        warn_sigma(lr, :cooksd)
         needed_stats[:cooksd] = needed_stats[:stdp].^2 ./  needed_stats[:stdr].^2 .* needed_stats[:student].^2 .* (1 / lr.p)
     end
 
-        for sym in present
+    for sym in present
         copieddf[!, sym] = needed_stats[sym]
     end
 

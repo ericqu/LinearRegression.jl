@@ -2,7 +2,7 @@ include("../src/utilities.jl")
 
 @testset "Plots request massaging" begin
     wanted = "all"
-    needed = Set([:fitplot, :residuals_plots, :normal_checks, :cooksd, :leverage, :homoscedasticity])
+    needed = Set([:fit, :residuals, :normal_checks, :cooksd, :leverage, :homoscedasticity])
     @test needed == get_needed_plots(wanted)
 
     wanted = []
@@ -17,12 +17,12 @@ include("../src/utilities.jl")
     needed = Set()
     @test needed == get_needed_plots(wanted)
 
-    wanted = ["fitplot", "cooksd", "homoscedasticity"]
-    needed = Set([:fitplot, :cooksd, :homoscedasticity])
+    wanted = ["fit", "cooksd", "homoscedasticity"]
+    needed = Set([:fit, :cooksd, :homoscedasticity])
     @test needed == get_needed_plots(wanted)
 
-    wanted = [:residuals_plots, :normal_checks]
-    needed = Set([:residuals_plots, :normal_checks])
+    wanted = [:residuals, :normal_checks]
+    needed = Set([:residuals, :normal_checks])
     @test needed == get_needed_plots(wanted)
 
     wanted = :leverage

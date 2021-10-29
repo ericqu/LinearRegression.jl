@@ -1,4 +1,4 @@
-get_all_plots_types() = Set([:fitplot, :residuals_plots, :normal_checks, :cooksd, :leverage, :homoscedasticity])
+get_all_plots_types() = Set([:fit, :residuals, :normal_checks, :cooksd, :leverage, :homoscedasticity])
 get_needed_plots(s::String) = return get_needed_plots([s])
 get_needed_plots(s::Symbol) = return get_needed_plots([s])
 get_needed_plots(s::Vector{String}) = return get_needed_plots(Symbol.(lowercase.(s)))
@@ -16,8 +16,8 @@ function get_needed_plots(p::Vector{Symbol})
         return get_all_plots_types()
     end
 
-    :fitplot in p && push!(needed_plots, :fitplot)
-    :residuals_plots in p && push!(needed_plots, :residuals_plots)
+    :fit in p && push!(needed_plots, :fit)
+    :residuals in p && push!(needed_plots, :residuals)
     :normal_checks in p && push!(needed_plots, :normal_checks)
     :cooksd in p && push!(needed_plots, :cooksd)
     :leverage in p && push!(needed_plots, :leverage)
@@ -383,5 +383,11 @@ function present_jarque_bera_test(residuals, α)
         topresent *= "  with $(alpha_value)% confidence: fail to reject null hyposthesis.\n"
     else 
         topresent *= "  with $(alpha_value)% confidence: reject null hyposthesis.\n"
+    end
+end
+
+function warn_sigma(lm, stat)
+    if length(lm.white_types) + length(lm.hac_types) > 0
+        println(io, "The $(stat) statistic that relies on Sigma^2 has been requested. At least one robust covariance have been requested indicating that the assumptions needed for Sigma^2 may not be present.")
     end
 end
