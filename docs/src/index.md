@@ -139,24 +139,25 @@ tw = [
 ] # data from https://blogs.sas.com/content/iml/2016/10/05/weighted-regression.html
 
 df = DataFrame(tw, [:y,:x,:w])
-lm = regress(@formula(y ~ x), df, weights="w")
+f = @formula(y ~ x)
+lm, ps= regress(f, df, "fit", weights="w")
 ```
 Which gives the following output:
 ```
-Model definition:       y ~ 1 + x
-Used observations:      10
+Model definition:      y ~ 1 + x
+Used observations:      3
 Weighted regression
 Model statistics:
-  R²: 0.0149549                 Adjusted R²: -0.108176
-  MSE: 0.182858                 RMSE: 0.427619
-  σ̂²: 0.182858
+  R²: 0.96                      Adjusted R²: 0.92
+  MSE: 0.48                     RMSE: 0.69282
+  σ̂²: 0.48
 Confidence interval: 95%
 
 Coefficients statistics:
 Terms ╲ Stats │     Coefs    Std err          t   Pr(>|t|)     low ci    high ci
 ──────────────┼─────────────────────────────────────────────────────────────────
-(Intercept)   │   2.32824    2.55186   0.912367   0.388242   -3.55637    8.21285
-x             │ 0.0853571   0.244924   0.348505   0.736455  -0.479438   0.650152
+(Intercept)   │      -0.2    0.69282  -0.288675   0.821088   -9.00312    8.60312
+x             │      1.44   0.293939    4.89898   0.128188   -2.29485    5.17485
 ```
 
 
