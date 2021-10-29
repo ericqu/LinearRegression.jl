@@ -1,5 +1,7 @@
 push!(LOAD_PATH,"../src/")
-using Documenter, LinearRegression, StatsModels, DataFrames, VegaLite
+using Documenter, StatsModels, DataFrames, VegaLite
+using Distributions, HypothesisTests
+using LinearRegression
 
 makedocs(sitename="LinearRegression.jl")
 
