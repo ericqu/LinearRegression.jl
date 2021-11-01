@@ -4,8 +4,9 @@
 LinearRegression.jl implements linear regression using the least-squares algorithm (relying on the sweep operator). This package is in the alpha stage. Hence it is likely that some bugs exist. Furthermore, the API might change in future versions.
 
 The usage aims to be straightforward, a call to ```regress``` to build a linear regression model, and a call to ```predict_in_sample``` to predict data using the built linear regression model.
+When predicting on data not present during the regression, use the ```predict_out_of_sample``` function as this does not require a response value (consequently statistics that require a response, like the residuals are not available.)
 
-The regress call will compute some statistics about the fitted model in addition to the coefficients. 
+The regress call will compute some statistics about the fitted model in addition to the coefficients. Which statistics is computed is dependent on which value receive the ```req_stats``` argument. 
 
 #### Number of observations and variables
 The number of observations ``n`` used to fit the model.
