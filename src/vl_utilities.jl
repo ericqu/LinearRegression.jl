@@ -1,4 +1,3 @@
-using VegaLite
 using StatsBase, LinearAlgebra , Distributions # for the density/histogram plot
 
 isnotintercept(t::AbstractTerm) = t isa InterceptTerm ? false : true
@@ -11,7 +10,7 @@ function fitplot!(all_plots, results, lm, plot_args)
 
     length(rhs_noint) == 0 && return nothing
     length(rhs_noint) > 1 && begin
-        println("LinearRegression: Fitplot was requested but not appropriate for regression with multiple independent variables")
+        println("LinearRegression: Fit plot was requested but not appropriate for regression with multiple independent variables")
         return nothing
     end
     length(lhs) == 0 && return nothing
@@ -53,7 +52,7 @@ function fitplot!(all_plots, results, lm, plot_args)
 
     all_plots["fit"] = fp
 end
-
+    
 function simple_residuals_plot(results, dep_var=nothing, show_density=false; plot_width=400, loess_bandwidth::Union{Nothing,Float64}=0.99)
     if isnothing(dep_var)
         dep_var = :predicted

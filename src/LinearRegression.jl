@@ -671,7 +671,7 @@ function predict_out_of_sample(lr::linRegRes, df::DataFrames.DataFrame; α=0.05,
 end
 
 """
-    function predict_in_sample(lr::linRegRes, df::DataFrames.DataFrame; α=0.05, req_stats=["none"], dropmissingvalues=true)
+    predict_in_sample(lr::linRegRes, df::DataFrames.DataFrame; α=0.05, req_stats=["none"], dropmissingvalues=true)
 
     Using the estimated coefficients from the regression make predictions, and calculate related statistics.
 """
