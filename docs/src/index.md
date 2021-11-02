@@ -4,9 +4,21 @@
 LinearRegression.jl implements linear regression using the least-squares algorithm (relying on the sweep operator). This package is in the alpha stage. Hence it is likely that some bugs exist. Furthermore, the API might change in future versions.
 
 The usage aims to be straightforward, a call to ```regress``` to build a linear regression model, and a call to ```predict_in_sample``` to predict data using the built linear regression model.
-When predicting on data not present during the regression, use the ```predict_out_of_sample``` function as this does not require a response value (consequently statistics that require a response, like the residuals are not available.)
+When predicting on data not present during the regression, use the ```predict_out_of_sample``` function as this does not require a response value (consequently, statistics that need a response, as the residuals, are not available.)
 
-The regress call will compute some statistics about the fitted model in addition to the coefficients. Which statistics is computed is dependent on which value receive the ```req_stats``` argument. 
+The regress call will compute some statistics about the fitted model in addition to the coefficients. The statistics computed depend on the value of the ```req_stats``` argument. 
+The prediction functions compute predicted values together with some statistics. Like for the regress calls, the statistics computed depend on the value of the ```req_stats``` argument.
+
+### Statistics related to the regression (the fitting)
+Fitting the model generates some statistics dependent on the `req_stats` argument of the `regress` function.
+- ``n``, ``p``, `"coefs"` and `"see"` are always computed
+- `"mse"`, `"sst"`, `"rmse"`, `"aic"`,  `"sigma"`, `"t_statistic"`, `"vif"`, `"r2"`, `"adjr2"`, `"stderror"`, `"t_values"`, `"p_values"`, `"ci"`,  are computed upon request.
+  - some diagnostics can be requested as well. Here is the full list as Symbols `[:diag_normality, :diag_ks, :diag_ad, :diag_jb, :diag_heteroskedasticity, :diag_white, :diag_bp ]`, `"diag_normality"` is a shortcut for `[:diag_ks, :diag_ad, :diag_jb]` and `:diag_heteroskedasticity` is a shortcut for `[:diag_white, :diag_bp]`. 
+- "default", includes the mandatory stats, and some of the optional statistics here as Symbols: `[:coefs, :sse, :mse, :sst, :rmse, :sigma, :t_statistic, :r2, :adjr2, :stderror, :t_values, :p_values, :ci]`
+- `"all"` includes all availble statistics
+- `"none"` include only the mandatory statistics
+
+The meaning for these statistics is given below.
 
 #### Number of observations and variables
 The number of observations ``n`` used to fit the model.
@@ -80,11 +92,21 @@ The p-values are computed using the F Distribution, the degree of freedom for ea
 Variance inflation factor (VIF) is calculated by taking the  diagonal elements of the inverse of the correlation matrix formed by the independent variables.
 
 ### Robust covariance estimators
+Robust Covariance estimator can be requested through the ```cov``` argument of the ```regress``` function.
+The options are (as Symbols):
+- `:white`: Heteroscedasticity 
+- `:hc0`: Heteroscedasticity
+- `:hc1`: Heteroscedasticity)
+- `:hc2`: Heteroscedasticity)
+- `:hc3`: Heteroscedasticity)
+- `:nw`: HAC (Heteroskedasticity and Autocorrelation Consistent estimator)
 
 #### Heteroscedasticity estimators
-The user can select estimators from these list. If the user select "White" as an estimator then HC3 will be selected for a small size (n < 250) otherwise HC0 will be selected.
+The user can select estimators from above list. If the user select `:white` as an estimator then HC3 will be selected for a small size (n <= 250) otherwise HC0 will be selected. (see "Using Heteroscedasticity Consitent Standard Errors in the Linear Regression Model" J. Scott Long and Laurie H. Ervin (1998-2000)).
+If another estimator is requested it is provided. A list of estimator can be requested as in for instance `cov=[:hc2, hc3]`.
+Comprehensive descriptions of the estimators and their applications shoudl in found in a text book, here only a brief description of the implementation is provided. 
+
 ##### HC0
-The following estimators can be calculated.
 Having InvMat the pseudo inverse resulting from the sweep operator. And having ``xe`` being the matrix of the independent variables times the residuals. Then HC0 is calculated as:
 ```math
 \textup{HC0} = \sqrt{diag(\textup{InvMat } \textup{xe}' \textup{xe} \textup{ InvMat})}
@@ -113,18 +135,105 @@ The leverage or hat matrix is calculated as:
 \textup{HC3} = \sqrt{diag(\textup{InvMat } \textup{xe}' \textup{xe} \textup{ InvMat } )}
 ```
 
-
-#### Heteroskedasticity and autocorrelation consistent estimator
+#### Heteroskedasticity and autocorrelation consistent estimator (HAC)
 
 Newey-West estimator calculation is not documented yet.
 See [reference implementation](https://github.com/mcreel/Econometrics/blob/508aee681ca42ff1f361fd48cd64de6565ece221/src/NP/NeweyWest.jl) [current implementation](https://github.com/ericqu/LinearRegression.jl/blob/docu/src/newey_west.jl) for details.
 
+### Statistics related to the prediction
+Predicting values using independent variables and a model will generate predicted values and some additional statistics dependent on the value of the `req_stats` argument of the `predict*` functions.
+Here is a list of the available statistics:
+[:predicted, :residuals, :leverage, :stdp, :stdi, :stdr, :student, :rstudent, :lcli, :ucli, :lclp, :uclp, :press, :cooksd]
+
+#### Predicted
+The predicted value is the sum of the dependant variable(s) multiplied by the coefficients from the regression and the intercept (if the model has one). The predicted value is also known as the Y-hat.
+
+#### Residuals
+The residuals are here defined as the known responses variables minus the predicted values.
+
+#### Leverage
+The leverage for the i-th independent observation x_i when it is not a weighted regression is calculated as:
+```math
+\mathrm{h_i} = \mathrm{x_i' (X' X)^{-1} x_i}
+```
+And as per below when it is a weighted regression with a vector of weights ``W`` with the i-th weight being ``w_i`` then the i-th leverage is calculated as such:
+```math
+\mathrm{h_i} = \mathrm{w_i \cdot  x_i' (X' W X)^{-1} x_i}
+```
+#### STDP
+STDP is the standard error of the mean predicted value, and is calculated as 
+```math
+\textup{STDP} = \sqrt{\hat{\sigma}^2 h_i }
+```
+and for a weighted regression as:
+```math
+\textup{STDP} = \sqrt{\hat{\sigma}^2 h_i  / w_i}
+```
+#### STDI
+STDI is the standard error of the individual predicted value, and is calculated as 
+```math
+\textup{STDI} = \sqrt{\hat{\sigma}^2 (1 + h_i)}
+```
+and for a weighted regression as:
+```math
+\textup{STDI} = \sqrt{\hat{\sigma}^2 (1 + h_i) / w_i}
+```
+#### STDR
+STDR is the standard error of the residual, and is calculated as 
+```math
+\textup{STDR} = \sqrt{\hat{\sigma}^2 (1 - h_i) }
+```
+and for a weighted regression as:
+```math
+\textup{STDR} = \sqrt{\hat{\sigma}^2 (1 - h_i) / w_i}
+```
+#### Student
+Student represents the standardized residuals, and is calculated by using the residuals over the standard error of the residuals.
+#### RStudent
+RStudent is the studentized residuals calculated as
+```math
+\textup{RSTUDENT} = \sqrt{ \frac{n - p - 1}{n - p - \textup{student}^2}} 
+```
+#### LCLI
+LCLI is the lower bound of the prediction interval and is calculated as:
+```math
+\textup{LCLI} = \mathrm{predicted} - ( \mathrm{t\_statistic} \cdot \mathrm{STDI} )
+```
+#### UCLI
+UCLI is the upper bound of the prediction interval and is calculated as:
+```math
+\textup{UCLI} = \mathrm{predicted} + ( \mathrm{t\_statistic} \cdot \mathrm{STDI} )
+```
+#### LCLP
+LCLP is the lower bound of the predicted mean confidence interval and is calculated as:
+```math
+\textup{LCLP} = \mathrm{predicted} - ( \mathrm{t\_statistic} \cdot \mathrm{STDP} )
+```
+#### UCLP
+UCLP is the upper bound of the predicted mean confidence interval and is calculated as:
+```math
+\textup{UCLI} = \mathrm{predicted} + ( \mathrm{t\_statistic} \cdot \mathrm{STDP} )
+```
+#### COOKSD
+COOKSD is the Cook's Distance for each predicted value, and is calculated as 
+```math
+\textup{COOKSD} = \frac{1}{p} \frac{\textup{STDP}^2}{\textup{STDR}^2 \cdot \textup{student}^2}
+```
+#### PRESS 
+PRESS is the predicted residual error sum of squares and is calculated as 
+```math
+\textup{PRESS} = \frac{\textup{residuals}}{1 - \textup{leverage}}
+```
 
 #### Weighted regression
 
 This version is the initial implementation of a weighted regression using analytical weights.
 Here is a minimal example illustrating its usage.
-```julia 
+```@example wls
+using LinearRegression, DataFrames, StatsModels
+using Distributions # for the data generation with Normal() and Uniform()
+using VegaLite
+
 tw = [
     2.3  7.4  0.058 
     3.0  7.6  0.073 
@@ -142,7 +251,11 @@ tw = [
 df = DataFrame(tw, [:y,:x,:w])
 f = @formula(y ~ x)
 lm, ps= regress(f, df, "fit", weights="w")
+ps["fit"] |> save("wls_fit_plot_doc.svg") ; nothing # hide
+lm
 ```
+![](wls_fit_plot_doc.svg)
+
 Which gives the following output:
 ```
 Model definition:      y ~ 1 + x
@@ -160,6 +273,9 @@ Terms ╲ Stats │     Coefs    Std err          t   Pr(>|t|)     low ci    hig
 (Intercept)   │      -0.2    0.69282  -0.288675   0.821088   -9.00312    8.60312
 x             │      1.44   0.293939    4.89898   0.128188   -2.29485    5.17485
 ```
+
+### general remarks
+For all options and parameters they can be passed as a `Vector{String}` or a `Vector{Symbol}` or alternatively if only options is needed as a single `String` or `Symbol`. For instance `"all"`, `:all` or `["R2", "VIF"]` or `[:r2, :vif]`. 
 
 
 ## Functions
