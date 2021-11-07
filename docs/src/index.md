@@ -73,8 +73,8 @@ The Akaike information criterion is calculated with the Linear Regression specif
 \mathrm{AIC} = \displaystyle n \ln \left( \frac{\mathrm{SSE}}{n} \right) + 2p
 ```
 
-#### t-statistic and confidence interval 
-The t-statistic is computed by using the inverse cumulative t-distribution (with ```quantile()```) with parameter (``n - p``) at ``1 - \frac{α}{2}``. 
+#### t_statistic and confidence interval 
+The t_statistic is computed by using the inverse cumulative t_distribution (with ```quantile()```) with parameter (``n - p``) at ``1 - \frac{α}{2}``. 
 
 The standard errors of the coefficients are calculated by multiplying the Sigma (estimated by the MSE) with the pseudo inverse matrix (resulting from the sweep operator), out of which the square root of the diagonal elements are extracted.
 
@@ -85,7 +85,6 @@ The upper bound of the confidence interval for each coefficient is calculated as
 The lower bound of the confidence interval for each coefficient is calculated as the coeffiecent - coefficient's standard error * t_statistic.
 
 #### p-values
-
 The p-values are computed using the F Distribution, the degree of freedom for each coefficent.
 
 #### Variance inflation factor
@@ -226,7 +225,6 @@ PRESS is the predicted residual error sum of squares and is calculated as
 ```
 
 #### Weighted regression
-
 This version is the initial implementation of a weighted regression using analytical weights.
 Here is a minimal example illustrating its usage.
 ```@example wls
