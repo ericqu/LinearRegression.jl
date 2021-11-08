@@ -550,9 +550,9 @@ function heteroscedasticity(t::Symbol, x, y, coefs, intercept, n, p, xytxy)
     e = y - lr_predict(x, coefs, intercept)
     xe = x .* e
 
-    if t == :white && n < 250  
+    if t == :white && n <= 250  
         t = :hc3
-    elseif t == :white && n >= 250
+    elseif t == :white && n > 250
         t = :hc0
     end
 
