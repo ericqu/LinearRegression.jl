@@ -6,7 +6,10 @@ using LinearRegression
 makedocs(sitename="LinearRegression.jl", modules = [LinearRegression] ,
     pages = Any[
         "Home" => "index.md",
-        "Tutorial" => "basic_tutorial.md"])
+        "Tutorials" => Any[
+            "Basic" => "basic_tutorial.md",
+            "Multiple regression" => "multi_tutorial.md" ]
+    ])
 
 deploydocs(
     repo = "github.com/ericqu/LinearRegression.jl.git",

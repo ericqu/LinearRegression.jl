@@ -1,6 +1,4 @@
 # LinearRegression.jl Documentation
-```@contents
-```
 LinearRegression.jl implements linear regression using the least-squares algorithm (relying on the sweep operator). This package is in the alpha stage. Hence it is likely that some bugs exist. Furthermore, the API might change in future versions.
 
 The usage aims to be straightforward, a call to ```regress``` to build a linear regression model, and a call to ```predict_in_sample``` to predict data using the built linear regression model.
@@ -73,16 +71,16 @@ The Akaike information criterion is calculated with the Linear Regression specif
 \mathrm{AIC} = \displaystyle n \ln \left( \frac{\mathrm{SSE}}{n} \right) + 2p
 ```
 
-#### t_statistic and confidence interval 
-The t_statistic is computed by using the inverse cumulative t_distribution (with ```quantile()```) with parameter (``n - p``) at ``1 - \frac{α}{2}``. 
+#### t\_statistic and confidence interval 
+The t\_statistic is computed by using the inverse cumulative t_distribution (with ```quantile()```) with parameter (``n - p``) at ``1 - \frac{α}{2}``. 
 
 The standard errors of the coefficients are calculated by multiplying the Sigma (estimated by the MSE) with the pseudo inverse matrix (resulting from the sweep operator), out of which the square root of the diagonal elements are extracted.
 
 The t-values are calculated as the coefficients divided by their standard deviation.
 
-The upper bound of the confidence interval for each coefficient is calculated as the coeffiecent + coefficient's standard error * t_statistic.
+The upper bound of the confidence interval for each coefficient is calculated as the coeffiecent + coefficient's standard error * t\_statistic.
 
-The lower bound of the confidence interval for each coefficient is calculated as the coeffiecent - coefficient's standard error * t_statistic.
+The lower bound of the confidence interval for each coefficient is calculated as the coeffiecent - coefficient's standard error * t\_statistic.
 
 #### p-values
 The p-values are computed using the F Distribution, the degree of freedom for each coefficent.
@@ -247,34 +245,14 @@ tw = [
 ] # data from https://blogs.sas.com/content/iml/2016/10/05/weighted-regression.html
 
 df = DataFrame(tw, [:y,:x,:w])
-f = @formula(y ~ x)
-lm, ps= regress(f, df, "fit", weights="w")
+lm, ps= regress(@formula(y ~ x), df, "fit", weights="w")
 ps["fit"] |> save("wls_fit_plot_doc.svg") ; nothing # hide
 lm
 ```
 ![](wls_fit_plot_doc.svg)
 
-Which gives the following output:
-```
-Model definition:      y ~ 1 + x
-Used observations:      3
-Weighted regression
-Model statistics:
-  R²: 0.96                      Adjusted R²: 0.92
-  MSE: 0.48                     RMSE: 0.69282
-  σ̂²: 0.48
-Confidence interval: 95%
-
-Coefficients statistics:
-Terms ╲ Stats │     Coefs    Std err          t   Pr(>|t|)     low ci    high ci
-──────────────┼─────────────────────────────────────────────────────────────────
-(Intercept)   │      -0.2    0.69282  -0.288675   0.821088   -9.00312    8.60312
-x             │      1.44   0.293939    4.89898   0.128188   -2.29485    5.17485
-```
-
-### general remarks
+### General remarks
 For all options and parameters they can be passed as a `Vector{String}` or a `Vector{Symbol}` or alternatively if only options is needed as a single `String` or `Symbol`. For instance `"all"`, `:all` or `["R2", "VIF"]` or `[:r2, :vif]`. 
-
 
 ## Functions
 ```@docs
@@ -282,10 +260,14 @@ regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame, req_plots; α::Flo
 regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame; α::Float64=0.05, req_stats=["default"], weights::Union{Nothing,String}=nothing,remove_missing=false, cov=[:none], contrasts=nothing)
 predict_in_sample(lr::linRegRes, df::DataFrames.DataFrame; α=0.05, req_stats=["none"], dropmissingvalues=true)
 predict_out_of_sample(lr::linRegRes, df::DataFrames.DataFrame; α=0.05, req_stats=["none"], dropmissingvalues=true)
-
 ```
 
 ## Index
 
 ```@index
+```
+
+## Content
+
+```@contents
 ```
