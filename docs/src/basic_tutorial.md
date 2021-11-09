@@ -1,6 +1,6 @@
 ## Tutorial Linear Regression Basics
 
-This tutorial details a simple regerssion analysis based on the Formaldehyde dataset.
+This tutorial details a simple regression analysis based on the "Formaldehyde" dataset.
 
 ### First, creating the dataset
 
