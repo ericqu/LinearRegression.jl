@@ -3,13 +3,13 @@ module LinearRegression
 using NamedArrays:length
 using LinearAlgebra:length
 using Distributions:length
-export regress, predict_in_sample, predict_out_of_sample, linRegRes
+export regress, predict_in_sample, predict_out_of_sample, linRegRes, kfold
 
 using Base: Tuple, Int64, Float64, Bool
 using StatsBase:eltype, isapprox, length, coefnames, push!, append!
 using Distributions, HypothesisTests
-using Printf, NamedArrays
-using StatsBase
+using Printf, NamedArrays, FreqTables # FreqTables for check_cardinality
+using StatsBase, Random
 using StatsModels, DataFrames
 using VegaLite
 
@@ -17,6 +17,7 @@ include("sweep_operator.jl")
 include("utilities.jl")
 include("vl_utilities.jl")
 include("newey_west.jl")
+include("kfold.jl")
 
 """
     struct linRegRes 
@@ -65,6 +66,7 @@ struct linRegRes
     BP_test::Union{Nothing,String}          # Store results of the Breusch-Pagan test
     weighted::Bool                          # Indicates if this is a weighted regression
     weights::Union{Nothing,String}          # Indicates which column of the dataframe contains the analytical weights
+    PRESS::Union{Nothing,Float64}           # Store the PRESS statistic
 end
 
 """
@@ -91,7 +93,10 @@ function Base.show(io::IO, lr::linRegRes)
     elseif !isnothing(lr.MSE)
         @printf(io, "  MSE: %g\n", lr.MSE)
     end
-
+    if !isnothing(lr.PRESS)
+        @printf(io, "  PRESS: %g\n", lr.PRESS)
+    end
+    
     if length(lr.white_types) + length(lr.hac_types) == 0
         if !isnothing(lr.σ̂²) && !isnothing(lr.AIC)
             @printf(io, "  σ̂²: %g\t\t\tAIC: %g\n", lr.σ̂², lr.AIC)
@@ -246,7 +251,7 @@ end
     It is possible to indicate the width of the plots, and the bandwidth of the Loess smoother.
 
 """
-function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame, req_plots; α::Float64=0.05, req_stats=["default"],
+function regress(f::StatsModels.FormulaTerm, df::AbstractDataFrame, req_plots; α::Float64=0.05, req_stats=["default"],
                 weights::Union{Nothing,String}=nothing, remove_missing=false, cov=[:none], contrasts=nothing, 
                 plot_args=Dict("plot_width" => 400, "loess_bw" => 0.6, "residuals_with_density" => false))
 
@@ -291,7 +296,7 @@ end
     For a weighted regression, the name of column containing the analytical weights shall be identified by the ```weights``` argument.
 
 """
-function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame; α::Float64=0.05, req_stats=["default"], weights::Union{Nothing,String}=nothing,
+function regress(f::StatsModels.FormulaTerm, df::DataFrames.AbstractDataFrame; α::Float64=0.05, req_stats=["default"], weights::Union{Nothing,String}=nothing,
                 remove_missing=false, cov=[:none], contrasts=nothing)
     intercept, f = hasintercept(f)
 
@@ -338,7 +343,13 @@ function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame; α::Float
     xytxy = xy' * xy 
 
     # mandatory stats
-    sse = sweep_op_full!(xytxy)[end]
+    sse = try 
+        sweep_op_full!(xytxy)[end]
+        catch ae 
+            throw(ae)
+        finally
+            check_cardinality(copieddf, updatedformula)
+        end
     coefs = xytxy[1:p, end]
     mse = xytxy[p + 1, p + 1] / (n - p)
 
@@ -378,7 +389,7 @@ function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame; α::Float
         scalar_stats[:t_statistic] = quantile(TDist(n - p), 1 - α / 2)
     end
     if :stderror in needed_stats
-        vector_stats[:stderror] = sqrt.(diag(mse * @view(xytxy[1:end - 1, 1:end - 1])))
+        vector_stats[:stderror] = real_sqrt.(diag(mse * @view(xytxy[1:end - 1, 1:end - 1])))
     end
     if :t_values in needed_stats
         vector_stats[:t_values] = coefs ./ vector_stats[:stderror]
@@ -419,22 +430,37 @@ function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame; α::Float
             end
         end 
     end
-
+    
+needed_white, needed_hac = get_needed_robust_cov_stats(cov)
 # robust estimators stats
-    needed_white, needed_hac = get_needed_robust_cov_stats(cov)
-    white_types = Vector{Symbol}()
-    white_stds = Vector{Vector}()
-    white_t_vals = Vector{Vector}()
-    white_p_vals = Vector{Vector}()
-    white_ci_up = Vector{Vector}()
-    white_ci_low = Vector{Vector}()
+white_types = Vector{Symbol}()
+white_stds = Vector{Vector}()
+white_t_vals = Vector{Vector}()
+white_p_vals = Vector{Vector}()
+white_ci_up = Vector{Vector}()
+white_ci_low = Vector{Vector}()
+hac_types = Vector{Symbol}()
+hac_stds = Vector{Vector}()
+hac_t_vals = Vector{Vector}()
+hac_p_vals = Vector{Vector}()
+hac_ci_up = Vector{Vector}()
+hac_ci_low = Vector{Vector}()
+
+# statistics requiring predictions (robust estimator and PRESS)
+if length(needed_white) > 0 || length(needed_hac) > 0 || :press in needed_stats
+    predict_results = predict_internal(copieddf, f, updatedformula, isweighted, weights, xytxy, coefs, intercept,
+        length(needed_white) > 0, length(needed_hac) > 0, mse, scalar_stats[:t_statistic], p, n;
+        α= α, req_stats=[:residuals, :press], dropmissingvalues = false)
+    residuals = predict_results.residuals
+    presses = predict_results.press
+    scalar_stats[:press] = sum(presses.^2)
 
     if length(needed_white) > 0
         for t in needed_white
             if t in white_types
                 continue
             end
-            cur_type, cur_std = heteroscedasticity(t, x, y, coefs, intercept, n, p, xytxy)
+            cur_type, cur_std = heteroscedasticity(t, x, y, residuals, n, p, xytxy)
             push!(white_types, cur_type)
             push!(white_stds, cur_std)
 
@@ -464,19 +490,12 @@ function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame; α::Float
         end
     end
 
-    hac_types = Vector{Symbol}()
-    hac_stds = Vector{Vector}()
-    hac_t_vals = Vector{Vector}()
-    hac_p_vals = Vector{Vector}()
-    hac_ci_up = Vector{Vector}()
-    hac_ci_low = Vector{Vector}()
-
     if length(needed_hac) > 0
         for t in needed_hac
             if t in hac_types
                 continue
             end
-            cur_type, cur_std = HAC(t, x, y, coefs, intercept, n, p)
+            cur_type, cur_std = HAC(t, x, y, residuals, n, p)
             push!(hac_types, cur_type)
             push!(hac_stds, cur_std)
 
@@ -505,6 +524,8 @@ function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame; α::Float
         end
     end
 
+end
+
     sres = linRegRes(xytxy, coefs, 
         white_types, hac_types,
         get(vector_stats, :stderror, nothing), white_stds, hac_stds, 
@@ -519,36 +540,34 @@ function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame; α::Float
         n, get(scalar_stats, :t_statistic, nothing), get(vector_stats, :vif, nothing), f, dataschema, updatedformula, α,
         get(diag_stats, :diag_ks, nothing), get(diag_stats, :diag_ad, nothing), get(diag_stats, :diag_jb, nothing),
         get(diag_stats, :diag_white, nothing),  get(diag_stats, :diag_bp, nothing),
-        isweighted, weights
+        isweighted, weights, get(scalar_stats, :press, nothing)
         )
     
     return sres
 end
 
 """
-    function HAC(t::Symbol, x, y, coefs, intercept, n, p)
+    function HAC(t::Symbol, x, y, residuals, n, p)
 
     (Internal) Return the relevant HAC (heteroskedasticity and autocorrelation consistent) estimator.
     In the current version only Newey-West is implemented.
 """
-function HAC(t::Symbol, x, y, coefs, intercept, n, p)
+function HAC(t::Symbol, x, y, residuals, n, p)
     inv_xtx = inv(x' * x)
-        e = y - lr_predict(x, coefs, intercept)
-    xe = x .* e
+    xe = x .* residuals
     return (t, sqrt.(diag(n * inv_xtx * newey_west(xe) * inv_xtx)))
 end
 
 """
-    function heteroscedasticity(t::Symbol, x, y, coefs, intercept, n, p)
+    function heteroscedasticity(t::Symbol, x, y, residuals, n, p, xytxy)
 
     (Internal) Compute the standard errors modified for the White's covariance estimator.
     Currently support HC0, HC1, HC2 and HC3. When :white is passed, select HC3 when the number of observation is below 250 otherwise select HC0.
 """
-function heteroscedasticity(t::Symbol, x, y, coefs, intercept, n, p, xytxy)
-    inv_xtx = inv(x' * x)
+function heteroscedasticity(t::Symbol, x, y, residuals, n, p, xytxy)
+        inv_xtx = inv(x' * x)
     XX = @view(xytxy[1:end - 1, 1:end - 1])
-    e = y - lr_predict(x, coefs, intercept)
-    xe = x .* e
+    xe = x .* residuals
 
     if t == :white && n <= 250  
         t = :hc3
@@ -558,21 +577,21 @@ function heteroscedasticity(t::Symbol, x, y, coefs, intercept, n, p, xytxy)
 
     if t == :hc0
         xetxe = xe' * xe
-        return (:hc0, sqrt.(diag(XX * xetxe * XX)))
+        return (:hc0, real_sqrt.(diag(XX * xetxe * XX)))
     elseif t == :hc1
         scale = (n / (n - p))
         xetxe = xe' * xe
-        return (:hc1, sqrt.(diag(XX * xetxe * XX .* scale)))
+        return (:hc1, real_sqrt.(diag(XX * xetxe * XX .* scale)))
     elseif t == :hc2
         leverage = diag(x * inv(x'x) * x')
         scale = @.( 1. / (1. - leverage))
-        xe = @.(xe .* real(sqrt(Complex(scale))))
+        xe = @.(xe .* real_sqrt(scale))
         xetxe = xe' * xe
         return (t, sqrt.(diag(XX * xetxe * XX)))
     elseif t == :hc3
         leverage = diag(x * inv(x'x) * x')
         scale = @.( 1. / (1. - leverage)^2)
-        xe = @.(xe .* real(sqrt(Complex(scale))))
+        xe = @.(xe .* real_sqrt(scale))
         xetxe = xe' * xe
         return (t, sqrt.(diag(XX * xetxe * XX)))
     else
@@ -581,122 +600,42 @@ function heteroscedasticity(t::Symbol, x, y, coefs, intercept, n, p, xytxy)
 
 end
 
-"""
-    function predict_out_of_sample(lr::linRegRes, df::DataFrames.DataFrame; α=0.05, req_stats=["none"], dropmissingvalues=true)
-
-    use the coefficients from a regression make predictions based on data (not including the response variable) from a DataFrame.
-"""
-function predict_out_of_sample(lr::linRegRes, df::DataFrames.DataFrame; α=0.05, req_stats=["none"], dropmissingvalues=true)
-    copieddf = copy(df)
-    if dropmissingvalues
-        dropmissing!(copieddf)
-    end
-    x = modelcols(lr.updformula.rhs, copieddf)
-    n, p = size(x)
-    copieddf[!, :predicted] = lr_predict(x, lr.coefs, lr.intercept)
-
-    needed, present = get_prediction_stats(req_stats)
-    needed_stats = Dict{Symbol,Vector}()
-        for sym in needed
-        needed_stats[sym] = zeros(length(n))
-    end
-    if :leverage in needed
-        pinverse = @view(lr.extended_inverse[1:end - 1, 1:end - 1])
-        if lr.weighted
-            needed_stats[:leverage] = copieddf[!, lr.weights] .* diag(x * pinverse * x')
-        else
-            needed_stats[:leverage] = diag(x * pinverse * x')
-        end
-    end
-    if :predicted in needed
-        needed_stats[:predicted] = lr_predict(x, lr.coefs, lr.intercept)
-    end
-    if :stdp in needed
-        if isnothing(lr.σ̂²)
-            throw(ArgumentError(":stdp requires that the σ̂² (:sigma) was previously calculated through the regression"))
-        end
-        warn_sigma(lr, :stdp)
-        if lr.weighted
-            needed_stats[:stdp] = sqrt.(needed_stats[:leverage] .* lr.σ̂² ./ copieddf[!, lr.weights])
-        else
-            needed_stats[:stdp] = sqrt.(needed_stats[:leverage] .* lr.σ̂²)
-        end
-    end
-    if :stdi in needed
-        if isnothing(lr.σ̂²)
-            throw(ArgumentError(":stdi requires that the σ̂² (:sigma) was previously calculated through the regression"))
-        end
-        warn_sigma(lr, :stdi)
-        if lr.weighted
-            needed_stats[:stdi] = sqrt.((1. .+ needed_stats[:leverage]) .* lr.σ̂² ./ copieddf[!, lr.weights])
-        else
-            needed_stats[:stdi] = sqrt.((1. .+ needed_stats[:leverage]) .* lr.σ̂²)
-        end
-    end
-    if :stdr in needed
-        if isnothing(lr.σ̂²)
-            throw(ArgumentError(":stdr requires that the σ̂² (:sigma) was previously calculated through the regression"))
-        end
-        warn_sigma(lr, :stdr)
-        if lr.weighted
-            needed_stats[:stdr] = sqrt.((1. .- needed_stats[:leverage]) .* lr.σ̂² ./ copieddf[!, lr.weights] )
-        else
-            needed_stats[:stdr] = sqrt.((1. .- needed_stats[:leverage]) .* lr.σ̂²)
-        end
-    end
-    if :lcli in needed
-        warn_sigma(lr, :lcli)
-        needed_stats[:lcli] = needed_stats[:predicted] .- (lr.t_statistic .* needed_stats[:stdi])
-    end
-    if :ucli in needed
-        warn_sigma(lr, :ucli)
-        needed_stats[:ucli] = needed_stats[:predicted] .+ (lr.t_statistic .* needed_stats[:stdi])
-    end
-    if :lclp in needed
-        warn_sigma(lr, :lclp)
-        needed_stats[:lclp] = needed_stats[:predicted] .- (lr.t_statistic .* needed_stats[:stdp])
-    end
-    if :uclp in needed
-        warn_sigma(lr, :uclp)
-        needed_stats[:uclp] = needed_stats[:predicted] .+ (lr.t_statistic .* needed_stats[:stdp])
-    end
-
-    for sym in present
-        if haskey(needed_stats, sym)
-            copieddf[!, sym] = needed_stats[sym]
-        end
-    end
-
-    return copieddf
-end
 
 """
-    predict_in_sample(lr::linRegRes, df::DataFrames.DataFrame; α=0.05, req_stats=["none"], dropmissingvalues=true)
+function predict_internal(df::AbstractDataFrame, modelformula, updatedformula, weighted, weights, extended_inverse,
+    coefs, intercept, needed_white, needed_hac, σ̂², t_statistic, p, n, oos=false;
+    α=0.05, req_stats=["none"], dropmissingvalues=true)
 
-    Using the estimated coefficients from the regression make predictions, and calculate related statistics.
+    Internal, user should use `predict_in_sample` or `predict_out_of_sample`. This should be used only when the `struct linRegRes` is not constructed yet. 
 """
-function predict_in_sample(lr::linRegRes, df::DataFrames.DataFrame; α=0.05, req_stats=["none"], dropmissingvalues=true)
+function predict_internal(df::AbstractDataFrame, modelformula, updatedformula, weighted, weights, extended_inverse,
+            coefs, intercept, needed_white, needed_hac, σ̂², t_statistic, p, n, oos=false;
+            α=0.05, req_stats=["none"], dropmissingvalues=true)
 
-    copieddf = df[: , Symbol.(keys(schema(lr.modelformula, df).schema))]
+    copieddf = df[: , Symbol.(keys(schema(modelformula, df).schema))]
     if dropmissingvalues == true
         dropmissing!(copieddf)
     end
 
-    if lr.weighted
-        if !in(Symbol(lr.weights), propertynames(df))
-            println(io, "Weights have been specified being the column $(lr.weights) however such colum does not exist in the dataframe provided. Regression will be done without weights")
+    if weighted
+        if !in(Symbol(weights), propertynames(df))
+            println(io, "Weights have been specified being the column $(weights) however such colum does not exist in the dataframe provided. Regression will be done without weights")
             weights = nothing
         else
-            copieddf[!, lr.weights] = df[!, lr.weights]
-            allowmissing!(copieddf, lr.weights)
-            copieddf[!, lr.weights][copieddf[!, lr.weights] .<= 0] .= missing
+            copieddf[!, weights] = df[!, weights]
+            allowmissing!(copieddf, weights)
+            copieddf[!, weights][copieddf[!, weights] .<= 0] .= missing
             dropmissing!(copieddf)
         end
     end
-    dataschema = schema(lr.modelformula, copieddf)
-    updatedformula = apply_schema(lr.modelformula, dataschema)
-    y, x = modelcols(updatedformula, copieddf)
-    n, p = size(x)
+    y = nothing
+    x = nothing
+
+    if oos
+        x = modelcols(updatedformula.rhs, copieddf)
+    else
+        y, x = modelcols(updatedformula, copieddf)
+    end
 
     needed, present = get_prediction_stats(req_stats)
     needed_stats = Dict{Symbol,Vector}()
@@ -704,82 +643,82 @@ function predict_in_sample(lr::linRegRes, df::DataFrames.DataFrame; α=0.05, req
         needed_stats[sym] = zeros(length(n))
     end
     if :leverage in needed
-        pinverse = @view(lr.extended_inverse[1:end - 1, 1:end - 1])
-        if lr.weighted
-            needed_stats[:leverage] = copieddf[!, lr.weights] .* diag(x * pinverse * x')
+        pinverse = @view(extended_inverse[1:end - 1, 1:end - 1])
+        if weighted
+            needed_stats[:leverage] = copieddf[!, weights] .* diag(x * pinverse * x')
         else
             needed_stats[:leverage] = diag(x * pinverse * x')
         end
     end
     if :predicted in needed
-        needed_stats[:predicted] = lr_predict(x, lr.coefs, lr.intercept)
+        needed_stats[:predicted] = lr_predict(x, coefs, intercept)
     end
-    if :residuals in needed
+    if :residuals in needed && oos == false
         needed_stats[:residuals] = y .- needed_stats[:predicted]
     end
     if :stdp in needed
-        if isnothing(lr.σ̂²)
+        if isnothing(σ̂²)
             throw(ArgumentError(":stdp requires that the σ̂² (:sigma) was previously calculated through the regression"))
         end
-        warn_sigma(lr, :stdp)
-        if lr.weighted
-            needed_stats[:stdp] = sqrt.(needed_stats[:leverage] .* lr.σ̂² ./ copieddf[!, lr.weights])
+        warn_sigma(needed_white, needed_hac, :stdp)
+        if weighted
+            needed_stats[:stdp] = real_sqrt.(needed_stats[:leverage] .* σ̂² ./ copieddf[!, weights])
         else
-            needed_stats[:stdp] = sqrt.(needed_stats[:leverage] .* lr.σ̂²)
+            needed_stats[:stdp] = real_sqrt.(needed_stats[:leverage] .* σ̂²)
         end
     end
     if :stdi in needed
-        if isnothing(lr.σ̂²)
+        if isnothing(σ̂²)
             throw(ArgumentError(":stdi requires that the σ̂² (:sigma) was previously calculated through the regression"))
         end
-        warn_sigma(lr, :stdi)
-        if lr.weighted
-            needed_stats[:stdi] = sqrt.((1. .+ needed_stats[:leverage]) .* lr.σ̂² ./ copieddf[!, lr.weights])
+        warn_sigma(needed_white, needed_hac, :stdi)
+        if weighted
+            needed_stats[:stdi] = real_sqrt.((1. .+ needed_stats[:leverage]) .* σ̂² ./ copieddf[!, weights])
         else
-            needed_stats[:stdi] = sqrt.((1. .+ needed_stats[:leverage]) .* lr.σ̂²)
+            needed_stats[:stdi] = real_sqrt.((1. .+ needed_stats[:leverage]) .* σ̂²)
         end
     end
     if :stdr in needed
-        if isnothing(lr.σ̂²)
+        if isnothing(σ̂²)
             throw(ArgumentError(":stdr requires that the σ̂² (:sigma) was previously calculated through the regression"))
         end
-        warn_sigma(lr, :stdr)
-        if lr.weighted
-            needed_stats[:stdr] = sqrt.((1. .- needed_stats[:leverage]) .* lr.σ̂² ./ copieddf[!, lr.weights] )
+        warn_sigma(needed_white, needed_hac, :stdr)
+        if weighted
+            needed_stats[:stdr] = real_sqrt.((1. .- needed_stats[:leverage]) .* σ̂² ./ copieddf[!, weights] )
         else
-            needed_stats[:stdr] = sqrt.((1. .- needed_stats[:leverage]) .* lr.σ̂²)
+            needed_stats[:stdr] = real_sqrt.((1. .- needed_stats[:leverage]) .* σ̂²)
         end
     end
-    if :student in needed
-        warn_sigma(lr, :student)
+    if :student in needed && oos == false
+        warn_sigma(needed_white, needed_hac, :student)
         needed_stats[:student] = needed_stats[:residuals] ./ needed_stats[:stdr]
     end
-    if :rstudent in needed
-        warn_sigma(lr, :rstudent)
-        needed_stats[:rstudent] = needed_stats[:student] .* real.(sqrt.(complex.((n .- p .- 1 ) ./ (n .- p .- needed_stats[:student].^2 ), 0)))
+    if :rstudent in needed && oos == false
+        warn_sigma(needed_white, needed_hac, :rstudent)
+        needed_stats[:rstudent] = needed_stats[:student] .* real_sqrt.( (n .- p .- 1 ) ./ (n .- p .- needed_stats[:student].^2 ) )
     end
     if :lcli in needed
-        warn_sigma(lr, :lcli)
-        needed_stats[:lcli] = needed_stats[:predicted] .- (lr.t_statistic .* needed_stats[:stdi])
+        warn_sigma(needed_white, needed_hac, :lcli)
+        needed_stats[:lcli] = needed_stats[:predicted] .- (t_statistic .* needed_stats[:stdi])
     end
     if :ucli in needed
-        warn_sigma(lr, :ucli)
-        needed_stats[:ucli] = needed_stats[:predicted] .+ (lr.t_statistic .* needed_stats[:stdi])
+        warn_sigma(needed_white, needed_hac, :ucli)
+        needed_stats[:ucli] = needed_stats[:predicted] .+ (t_statistic .* needed_stats[:stdi])
     end
     if :lclp in needed
-        warn_sigma(lr, :lclp)
-        needed_stats[:lclp] = needed_stats[:predicted] .- (lr.t_statistic .* needed_stats[:stdp])
+        warn_sigma(needed_white, needed_hac, :lclp)
+        needed_stats[:lclp] = needed_stats[:predicted] .- (t_statistic .* needed_stats[:stdp])
     end
     if :uclp in needed
-        warn_sigma(lr, :uclp)
-        needed_stats[:uclp] = needed_stats[:predicted] .+ (lr.t_statistic .* needed_stats[:stdp])
+        warn_sigma(needed_white, needed_hac, :uclp)
+        needed_stats[:uclp] = needed_stats[:predicted] .+ (t_statistic .* needed_stats[:stdp])
     end
-    if :press in needed
+    if :press in needed && oos == false
         needed_stats[:press] = needed_stats[:residuals] ./ (1. .- needed_stats[:leverage])
     end
-    if :cooksd in needed
-        warn_sigma(lr, :cooksd)
-        needed_stats[:cooksd] = needed_stats[:stdp].^2 ./  needed_stats[:stdr].^2 .* needed_stats[:student].^2 .* (1 / lr.p)
+    if :cooksd in needed && oos == false
+        warn_sigma(needed_white, needed_hac, :cooksd)
+        needed_stats[:cooksd] = needed_stats[:stdp].^2 ./  needed_stats[:stdr].^2 .* needed_stats[:student].^2 .* (1 / p)
     end
 
     for sym in present
@@ -787,6 +726,28 @@ function predict_in_sample(lr::linRegRes, df::DataFrames.DataFrame; α=0.05, req
     end
 
     return copieddf
+end
+
+
+"""
+    predict_in_sample(lr::linRegRes, df::DataFrames.DataFrame; α=0.05, req_stats=["none"], dropmissingvalues=true)
+
+    Using the estimated coefficients from the regression make predictions, and calculate related statistics.
+"""
+function predict_in_sample(lr::linRegRes, df::AbstractDataFrame; α=0.05, req_stats=["none"], dropmissingvalues=true)
+    predict_internal(df, lr.modelformula, lr.updformula, lr.weighted, lr.weights, lr.extended_inverse, lr.coefs, lr.intercept,
+        lr.white_types, lr.hac_types, lr.σ̂², lr.t_statistic, lr.p, lr.observations;
+        α=α, req_stats=req_stats, dropmissingvalues=dropmissingvalues)
+end
+
+""" predict out of sample
+
+call predict with the out of sample (last argument) set to true
+"""
+function predict_out_of_sample(lr::linRegRes, df::AbstractDataFrame; α=0.05, req_stats=["none"], dropmissingvalues=true)
+    predict_internal(df, lr.modelformula, lr.updformula, lr.weighted, lr.weights, lr.extended_inverse, lr.coefs, lr.intercept,
+        lr.white_types, lr.hac_types, lr.σ̂², lr.t_statistic, lr.p, lr.observations, true;
+        α=α, req_stats=req_stats, dropmissingvalues=dropmissingvalues)
 end
 
 end # end of module definition

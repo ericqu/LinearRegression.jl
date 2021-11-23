@@ -16,11 +16,12 @@
     @test isapprox(lm1.ci_up, [0.02683549469867456, 0.9138636114098853])
     @test isapprox(lm1.t_statistic, 2.7764451051977934)
     @test isapprox(lm1.VIF, [0.,  1.])
+    @test isapprox(lm1.PRESS, 0.0010755278041106075)
 end
 
 @testset "from glm regresspredict" begin 
     fdf = DataFrame(Carb=[0.1,0.3,0.5,0.6,0.7,0.9], OptDen=[0.086,0.269,0.446,0.538,0.626,0.782])
-    lm1 = regress(@formula(OptDen ~ 1 + Carb), fdf, α=0.05, req_stats=[:default, :aic, :vif])
+    lm1 = regress(@formula(OptDen ~ 1 + Carb), fdf, α=0.05, req_stats=[:default, :aic, :vif, :press])
     target_coefs = [0.005085714285713629, 0.8762857142857156]
     @test isapprox(target_coefs, lm1.coefs)
     @test lm1.p == 2 
@@ -35,7 +36,8 @@ end
     @test isapprox(lm1.ci_up, [0.02683549469867456, 0.9138636114098853])
     @test isapprox(lm1.t_statistic, 2.7764451051977934)
     @test isapprox(lm1.VIF, [0.,  1.])
-
+    @test isapprox(lm1.PRESS, 0.0010755278041106075)
+ 
     lm1 = regress(@formula(OptDen ~ 1 + Carb), fdf, α=0.05, req_stats=["none"])
     target_coefs = [0.005085714285713629, 0.8762857142857156]
     @test isapprox(target_coefs, lm1.coefs)

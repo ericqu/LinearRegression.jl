@@ -68,7 +68,7 @@ end
     Returns all statistics availble for the fitted model.
 """
 get_all_model_stats() = Set([:coefs, :sse, :mse, :sst, :rmse, :aic, :sigma, :t_statistic, :vif, :r2, :adjr2, :stderror, :t_values, :p_values, :ci,
-                            :diag_normality, :diag_ks, :diag_ad, :diag_jb, :diag_heteroskedasticity, :diag_white, :diag_bp ])
+                            :diag_normality, :diag_ks, :diag_ad, :diag_jb, :diag_heteroskedasticity, :diag_white, :diag_bp, :press ])
 
 get_needed_model_stats(req_stats::String) = return get_needed_model_stats([req_stats])
 get_needed_model_stats(req_stats::Symbol) = return get_needed_model_stats(Set([req_stats]))
@@ -95,6 +95,7 @@ function get_needed_model_stats(req_stats::Vector{Symbol})
     :default in req_stats && union!(needed, default)
 
     :sst in req_stats && push!(needed, :sst)
+    :press in req_stats && push!(needed, :press)
     :rmse in req_stats && push!(needed, :rmse)
     :aic in req_stats && push!(needed, :aic)
     :sigma in req_stats && push!(needed, :sigma)
@@ -289,15 +290,16 @@ end
 
 using NamedArrays
 """
-    function my_namedarray_print(io::IO, n::NamedArray)
+    function my_namedarray_print([io::IO = stdout], n::NamedArray)
 
-    (internal) Print the NamedArray with the type annotation (on the first line).
+    (internal) Print the NamedArray without the type annotation (on the first line).
 """
-function my_namedarray_print(io::IO, n::NamedArray)
+function my_namedarray_print(io::IO, n)
     tmpio = IOBuffer()
     show(tmpio, n)
     println(io, split(String(take!(tmpio)), "\n", limit=2)[2])
 end
+my_namedarray_print(n::NamedArray) = my_namedarray_print(stdout::IO, n)
 
 """
     function helper_print_table(io, title, stats::Vector, stats_name::Vector, updformula)
@@ -386,8 +388,39 @@ function present_jarque_bera_test(residuals, α)
     end
 end
 
+# function warn_sigma(lm, stat)
+#     if length(lm.white_types) + length(lm.hac_types) > 0
+#         println(io, "The $(stat) statistic that relies on Sigma^2 has been requested. At least one robust covariance have been requested indicating that the assumptions needed for Sigma^2 may not be present.")
+#     end
+# end
+
 function warn_sigma(lm, stat)
-    if length(lm.white_types) + length(lm.hac_types) > 0
+    warn_sigma(lm.white_types, lm.hac_types , stat)
+end
+
+function warn_sigma(white_needed, hac_needed, stat)
+    if length(white_needed) > 0 || length(hac_needed) > 0 
         println(io, "The $(stat) statistic that relies on Sigma^2 has been requested. At least one robust covariance have been requested indicating that the assumptions needed for Sigma^2 may not be present.")
+    end
+end
+
+function real_sqrt(x)
+    return @. real(sqrt(complex(x, 0)))
+end
+
+isnotintercept(t::AbstractTerm) = t isa InterceptTerm ? false : true
+iscontinuousterm(t::AbstractTerm) = t isa ContinuousTerm ? true : false
+iscategorical(t::AbstractTerm) = t isa CategoricalTerm ? true : false
+
+function check_cardinality(df::AbstractDataFrame, f, verbose=false)
+    cate_terms = [a.sym for a in filter(iscategorical, terms(f.rhs))]
+    if length(cate_terms) > 0 
+        freqt = freqtable(df, cate_terms...)
+        if count(i -> (i == 0), freqt) > 0 
+            println("At least one group of categories have no observation. Use frequency tables to identify which one(s).")
+            println(my_namedarray_print(freqt))
+        elseif verbose == true
+            println("No issue identified.")
+        end
     end
 end

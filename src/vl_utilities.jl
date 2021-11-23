@@ -1,8 +1,5 @@
 using StatsBase, LinearAlgebra , Distributions # for the density/histogram plot
 
-isnotintercept(t::AbstractTerm) = t isa InterceptTerm ? false : true
-iscontinuousterm(t::AbstractTerm) = t isa ContinuousTerm ? true : false
-
 function fitplot!(all_plots, results, lm, plot_args)
 
     lhs = terms(lm.updformula.lhs)
@@ -53,22 +50,30 @@ function fitplot!(all_plots, results, lm, plot_args)
     all_plots["fit"] = fp
 end
     
-function simple_residuals_plot(results, dep_var=nothing, show_density=false; plot_width=400, loess_bandwidth::Union{Nothing,Float64}=0.99)
+function simple_residuals_plot(results, dep_var=nothing, show_density=false, st_res=false; plot_width=400, loess_bandwidth::Union{Nothing,Float64}=0.99)
     if isnothing(dep_var)
         dep_var = :predicted
+    end
+
+    yaxis = :residuals
+    if st_res == true
+        yaxis = :student
     end
     
     loess_p = @vlplot()
     if !isnothing(loess_bandwidth)
         loess_p = @vlplot(
-            transform = [ { loess = :residuals, on = dep_var, bandwidth = loess_bandwidth } ],
+            transform = [ { loess = yaxis, on = dep_var, bandwidth = loess_bandwidth } ],
             mark = {:line, color = "firebrick"},
             x = {dep_var, type = :quantitative},
-            y = {:residuals, type = :quantitative} )
+            y = {yaxis, type = :quantitative} )
     end
 
     title = "Residuals plot: $(string(dep_var))"
-    sresults = select(results, [:residuals, dep_var])
+    if st_res == true
+        title = "st " * title
+    end
+    sresults = select(results, [yaxis, dep_var])
 
     p = sresults |> 
     @vlplot(title = title, width = plot_width, height = plot_width,
@@ -76,7 +81,7 @@ function simple_residuals_plot(results, dep_var=nothing, show_density=false; plo
         y = {type = :quantitative, axis = {grid = false}}) +
     @vlplot(:point, 
        x = {dep_var, type = :quantitative}, 
-       y = {:residuals, type = :quantitative}) +
+       y = {yaxis, type = :quantitative}) +
     loess_p +
     @vlplot(mark = {:rule, color = :darkgrey}, y = {type = :quantitative, datum = 0})
 
@@ -87,7 +92,7 @@ function simple_residuals_plot(results, dep_var=nothing, show_density=false; plo
     mp = sresults |> @vlplot(
         width = 100, height = plot_width,
         mark = {:area, orient = "horizontal"},
-        transform = [{density = :residuals, bandwidth = 0.5}],
+        transform = [{density = yaxis, bandwidth = 0.5}],
         x = {"density:q", title = nothing, axis = nothing},
         y = {"value:q", title = nothing, axis = nothing } )
         
@@ -107,12 +112,14 @@ function residuals_plots!(all_plots, results, lm, plot_args)
 
     # main residual plot 
     all_plots["residuals"] = simple_residuals_plot(results, plot_width=plot_width, loess_bandwidth=loess_bw)
+    all_plots["st residuals"] = simple_residuals_plot(results,nothing, false, true, plot_width=plot_width, loess_bandwidth=loess_bw)
 
     # additional plot per dependent variable
     for c_dependent_var in rhs_noint
         c_sym = c_dependent_var.sym
         show_density = density_requested && iscontinuousterm(c_dependent_var)
         all_plots[string("residuals ", string(c_sym))] = simple_residuals_plot(results, c_sym, show_density, plot_width=plot_width, loess_bandwidth=loess_bw)
+        all_plots[string("st residuals ", string(c_sym))] = simple_residuals_plot(results, c_sym, show_density, true, plot_width=plot_width, loess_bandwidth=loess_bw)
     end
 
 end

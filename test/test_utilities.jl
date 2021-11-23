@@ -119,11 +119,14 @@ end
     @test needed == get_needed_model_stats(wanted)
     wanted = ["all"]
     needed = Set([:coefs, :sse, :mse, :sst, :rmse, :aic, :sigma, :t_statistic, :vif, :r2, :adjr2, :stderror, :t_values, :p_values, :ci,
-                    :diag_normality, :diag_ks, :diag_ad, :diag_jb, :diag_heteroskedasticity, :diag_white, :diag_bp ])
+                    :diag_normality, :diag_ks, :diag_ad, :diag_jb, :diag_heteroskedasticity, :diag_white, :diag_bp, :press ])
     @test needed == get_needed_model_stats(wanted)
     wanted = [ ]
     needed = Set([:coefs, :mse, :sse])
-    @test needed == get_needed_model_stats(wanted)    
+    @test needed == get_needed_model_stats(wanted)
+    wanted = ["press" ]
+    needed = Set([:coefs, :mse, :sse, :press])
+    @test needed == get_needed_model_stats(wanted)
     wanted = [ "bogus"]
     needed = Set([:coefs, :mse, :sse])
     @test needed == get_needed_model_stats(wanted)

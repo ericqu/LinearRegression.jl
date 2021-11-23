@@ -15,7 +15,7 @@ function sweep_op_internal!(A::AbstractMatrix{Float64}, k::Int64)
     @inbounds D = A[k,k] # step 1 D = Aₖₖ
     
     if D == zero(eltype(A))
-        throw(error("the element $k,$k is zero"))
+        throw(ArgumentError("sweep_op_internal!: the element $k,$k of the matrix is zero. Is the Design Matrix symmetric positive definite?"))
     end
     
     @inbounds for i in 1:p
