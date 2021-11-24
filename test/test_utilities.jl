@@ -76,19 +76,19 @@ end
 
 @testset "model stats massaging" begin
     wanted = ["default"]
-    needed = Set([:coefs, :sse, :mse, :sst, :rmse, :sigma, :t_statistic, :r2, :adjr2, :stderror, :t_values, :p_values, :ci])
+    needed = Set([:coefs, :sse, :mse, :sst, :rmse, :sigma, :t_statistic, :r2, :adjr2, :stderror, :t_values, :p_values, :ci, :scorr2, :t2ss])
     @test needed == get_needed_model_stats(wanted)
     wanted = [:default, :vif]
-    needed = Set([:coefs, :sse, :vif, :mse, :sst, :rmse, :sigma, :t_statistic, :r2, :adjr2, :stderror, :t_values, :p_values, :ci])
+    needed = Set([:coefs, :sse, :vif, :mse, :sst, :rmse, :sigma, :t_statistic, :r2, :adjr2, :stderror, :t_values, :p_values, :ci, :scorr2, :t2ss])
     @test needed == get_needed_model_stats(wanted)
     wanted = [:default, :diag_ks]
-    needed = Set([:coefs, :sse, :diag_ks, :mse, :sst, :rmse, :sigma, :t_statistic, :r2, :adjr2, :stderror, :t_values, :p_values, :ci])
+    needed = Set([:coefs, :sse, :diag_ks, :mse, :sst, :rmse, :sigma, :t_statistic, :r2, :adjr2, :stderror, :t_values, :p_values, :ci, :scorr2, :t2ss])
     @test needed == get_needed_model_stats(wanted)
     wanted = [:default, :diag_normality]
-    needed = Set([:coefs, :sse, :diag_ks, :diag_ad, :diag_jb, :mse, :sst, :rmse, :sigma, :t_statistic, :r2, :adjr2, :stderror, :t_values, :p_values, :ci])
+    needed = Set([:coefs, :sse, :diag_ks, :diag_ad, :diag_jb, :mse, :sst, :rmse, :sigma, :t_statistic, :r2, :adjr2, :stderror, :t_values, :p_values, :ci, :scorr2, :t2ss])
     @test needed == get_needed_model_stats(wanted)
     wanted = [:default, :diag_heteroskedasticity]
-    needed = Set([:coefs, :sse, :diag_white, :diag_bp, :mse, :sst, :rmse, :sigma, :t_statistic, :r2, :adjr2, :stderror, :t_values, :p_values, :ci])
+    needed = Set([:coefs, :sse, :diag_white, :diag_bp, :mse, :sst, :rmse, :sigma, :t_statistic, :r2, :adjr2, :stderror, :t_values, :p_values, :ci, :scorr2, :t2ss])
     @test needed == get_needed_model_stats(wanted)
     wanted = ["r2", "rmse"]
     needed = Set([:r2, :rmse, :coefs, :sse, :mse, :sst])
@@ -119,11 +119,33 @@ end
     @test needed == get_needed_model_stats(wanted)
     wanted = ["all"]
     needed = Set([:coefs, :sse, :mse, :sst, :rmse, :aic, :sigma, :t_statistic, :vif, :r2, :adjr2, :stderror, :t_values, :p_values, :ci,
-                    :diag_normality, :diag_ks, :diag_ad, :diag_jb, :diag_heteroskedasticity, :diag_white, :diag_bp ])
+                    :diag_normality, :diag_ks, :diag_ad, :diag_jb, :diag_heteroskedasticity, :diag_white, :diag_bp, :press, 
+                    :t1ss, :t2ss, :pcorr1, :pcorr2, :scorr1, :scorr2])
     @test needed == get_needed_model_stats(wanted)
     wanted = [ ]
     needed = Set([:coefs, :mse, :sse])
-    @test needed == get_needed_model_stats(wanted)    
+    @test needed == get_needed_model_stats(wanted)
+    wanted = ["press" ]
+    needed = Set([:coefs, :mse, :sse, :press])
+    @test needed == get_needed_model_stats(wanted)
+    wanted = ["t1ss" ]
+    needed = Set([:coefs, :mse, :sse, :t1ss])
+    @test needed == get_needed_model_stats(wanted)
+    wanted = ["t2ss", "t1ss" ]
+    needed = Set([:coefs, :mse, :sse, :t1ss, :t2ss])
+    @test needed == get_needed_model_stats(wanted)
+    wanted = ["pcorr1" ]
+    needed = Set([:coefs, :mse, :sse, :t1ss, :pcorr1])
+    @test needed == get_needed_model_stats(wanted)
+    wanted = ["pcorr1", "pcorr2" ]
+    needed = Set([:coefs, :mse, :sse, :t1ss, :t2ss, :pcorr1, :pcorr2])
+    @test needed == get_needed_model_stats(wanted)
+    wanted = [:scorr1 ]
+    needed = Set([:coefs, :mse, :sse, :sst, :t1ss, :scorr1])
+    @test needed == get_needed_model_stats(wanted)
+    wanted = [:scorr1, :scorr2 ]
+    needed = Set([:coefs, :mse, :sse, :sst, :t1ss, :t2ss, :scorr1, :scorr2])
+    @test needed == get_needed_model_stats(wanted)
     wanted = [ "bogus"]
     needed = Set([:coefs, :mse, :sse])
     @test needed == get_needed_model_stats(wanted)

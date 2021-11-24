@@ -244,9 +244,7 @@ x ^ 3         │     1.04075    0.0129463      80.3897  5.60424e-92      1.0150
 
 Finally if you would like more examples I encourage you to go to the documentation as it gives a few more examples. 
 
-## Notable changes since version 0.71
-- Addition of weighted regression.
-- The function to predict values have been renamed. Now there is a function to predict in-sample values and one to predict out-of-sample values.
-- It is possible to generate, through Vega-lite, some plot about the regression being studied.
-- "contrasts" following the same syntax as GLM can be passed as a parameter to the ```regress``` function
-- It is possible to request some test about normality of the residuals and heteroscedasticity (this relies on the HypothesisTests package)
+## Notable changes since version 0.72
+- Addition of cross-validation features: K-fold cross-validation and the PRESS statistic at the model level.
+- Addition of several model statistics: Type 1 and 2 SS, squared partial correlation coefficients based on Type 1 SS and Type 2 SS, squared semi-partial correlation coefficients based on Type 1 and 2 SS. The squared semi-partial correlation coefficient based on Type 2 SS is added to the default list of statistics at the model level.
+- additional diagnostic using the frequency tables to identify a set of categories with no observation.

@@ -7,6 +7,8 @@ When predicting on data not present during the regression, use the ```predict_ou
 The regress call will compute some statistics about the fitted model in addition to the coefficients. The statistics computed depend on the value of the ```req_stats``` argument. 
 The prediction functions compute predicted values together with some statistics. Like for the regress calls, the statistics computed depend on the value of the ```req_stats``` argument.
 
+When some analytical positive weights are used, a weighted regression is performed.
+
 ### Statistics related to the regression (the fitting)
 Fitting the model generates some statistics dependent on the `req_stats` argument of the `regress` function.
 - ``n``, ``p``, `"coefs"` and `"see"` are always computed
@@ -86,7 +88,10 @@ The lower bound of the confidence interval for each coefficient is calculated as
 The p-values are computed using the F Distribution, the degree of freedom for each coefficent.
 
 #### Variance inflation factor
-Variance inflation factor (VIF) is calculated by taking the  diagonal elements of the inverse of the correlation matrix formed by the independent variables.
+Variance inflation factor (VIF) is calculated by taking the diagonal elements of the inverse of the correlation matrix formed by the independent variables.
+
+#### PRESS predicted residual error sum of squares
+The predicted residual error sum of squares is calculated by taking the sum of squares from the `PRESS` (see below the statistics related to predictions) of each observations. 
 
 ### Robust covariance estimators
 Robust Covariance estimator can be requested through the ```cov``` argument of the ```regress``` function.
@@ -221,45 +226,49 @@ PRESS is the predicted residual error sum of squares and is calculated as
 ```math
 \textup{PRESS} = \frac{\textup{residuals}}{1 - \textup{leverage}}
 ```
+#### Type 1 SS
+Type 1 Sum of squares, are calculated as a by-product of the sweep operator.
 
-#### Weighted regression
-This version is the initial implementation of a weighted regression using analytical weights.
-Here is a minimal example illustrating its usage.
-```@example wls
-using LinearRegression, DataFrames, StatsModels
-using Distributions # for the data generation with Normal() and Uniform()
-using VegaLite
+#### Type 2 SS
+Type 2 Sum of squares, are calculated using the pseudo-inverse matrix. The Type 2 SS of the ith independent variable is the square of the coefficient of the independent variable divided by the ith element of the diagonal from the pseudo-inverse matrix.
 
-tw = [
-    2.3  7.4  0.058 
-    3.0  7.6  0.073 
-    2.9  8.2  0.114 
-    4.8  9.0  0.144 
-    1.3 10.4  0.151 
-    3.6 11.7  0.119 
-    2.3 11.7  0.119 
-    4.6 11.8  0.114 
-    3.0 12.4  0.073 
-    5.4 12.9  0.035 
-    6.4 14.0  0
-] # data from https://blogs.sas.com/content/iml/2016/10/05/weighted-regression.html
-
-df = DataFrame(tw, [:y,:x,:w])
-lm, ps= regress(@formula(y ~ x), df, "fit", weights="w")
-ps["fit"] |> save("wls_fit_plot_doc.svg") ; nothing # hide
-lm
+#### Pcorr 1 and 2 
+`pcorr1` and `pcorr2` are the squared partial correlation coefficient calculated as:
+```math
+\textup{pcorr1} = \frac{\textup{Type 1 SS}}{\textup{Type 1 SS}+ \textup{SSE}}
 ```
-![](wls_fit_plot_doc.svg)
+
+```math
+\textup{pcorr2} = \frac{\textup{Type 2 SS}}{\textup{Type 2 SS}+ \textup{SSE}}
+```
+When there is an intercept in the model the `pcorr1` and `pcorr2` are considered `missing` for the intercept.
+
+#### Scorr 1 and 2 
+`scorr1` and `scorr2` are the squared semi-partial correlation coefficient calculated as:
+```math
+\textup{scorr1} = \frac{\textup{Type 1 SS}}{\textup{SST}}
+```
+
+```math
+\textup{scorr2} = \frac{\textup{Type 2 SS}}{\textup{SST}}
+```
+When there is an intercept in the model the `scorr1` and `scorr2` are considered `missing` for the intercept.
 
 ### General remarks
 For all options and parameters they can be passed as a `Vector{String}` or a `Vector{Symbol}` or alternatively if only options is needed as a single `String` or `Symbol`. For instance `"all"`, `:all` or `["R2", "VIF"]` or `[:r2, :vif]`. 
 
 ## Functions
 ```@docs
-regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame, req_plots; α::Float64=0.05, req_stats=["default"], weights::Union{Nothing,String}=nothing, remove_missing=false, cov=[:none], contrasts=nothing, plot_args=Dict("plot_width" => 400, "loess_bw" => 0.6, "residuals_with_density" => false))
-regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame; α::Float64=0.05, req_stats=["default"], weights::Union{Nothing,String}=nothing,remove_missing=false, cov=[:none], contrasts=nothing)
-predict_in_sample(lr::linRegRes, df::DataFrames.DataFrame; α=0.05, req_stats=["none"], dropmissingvalues=true)
-predict_out_of_sample(lr::linRegRes, df::DataFrames.DataFrame; α=0.05, req_stats=["none"], dropmissingvalues=true)
+function regress(f::StatsModels.FormulaTerm, df::DataFrames.AbstractDataFrame; α::Float64=0.05, req_stats=["default"], weights::Union{Nothing,String}=nothing, remove_missing=false, cov=[:none], contrasts=nothing)
+
+function regress(f::StatsModels.FormulaTerm, df::AbstractDataFrame, req_plots; α::Float64=0.05, req_stats=["default"], weights::Union{Nothing,String}=nothing, remove_missing=false, cov=[:none], contrasts=nothing, plot_args=Dict("plot_width" => 400, "loess_bw" => 0.6, residuals_with_density" => false))
+
+function predict_out_of_sample(lr::linRegRes, df::AbstractDataFrame; α=0.05, req_stats=["none"], dropmissingvalues=true)
+
+function predict_in_sample(lr::linRegRes, df::AbstractDataFrame; α=0.05, req_stats=["none"], dropmissingvalues=true)
+
+function kfold(f, df, k, r = 1, shuffle=true; kwargs...)
+
 ```
 
 ## Index
