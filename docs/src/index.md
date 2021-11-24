@@ -224,6 +224,28 @@ PRESS is the predicted residual error sum of squares and is calculated as
 ```math
 \textup{PRESS} = \frac{\textup{residuals}}{1 - \textup{leverage}}
 ```
+#### Type 1 SS
+Type 1 Sum of squares, are calculated as a by-product of the sweep operator.
+
+#### Type 2 SS
+Type 2 Sum of squares, are calculated using the pseudo-inverse matrix. The Type 2 SS of the ith independent variable is the square of the coefficient of the independent variable divided by the ith element of the diagonal from the pseudo-inverse matrix.
+
+#### Pcorr 1 and 2 
+`pcorr1` and `pcorr2` are the squared partial correlation coefficient calculated as:
+```math
+\textup{pcorr1} = \frac{\textup{Type 1 SS}}{\textup{Type 1 SS}+ \textup{SSE}}
+\textup{pcorr2} = \frac{\textup{Type 2 SS}}{\textup{Type 2 SS}+ \textup{SSE}}
+```
+When there is an intercept in the model the `pcorr1` and `pcorr2` are considered `missing` for the intercept.
+
+#### Scorr 1 and 2 
+`scorr1` and `scorr2` are the squared semi-partial correlation coefficient calculated as:
+```math
+\textup{scorr1} = \frac{\textup{Type 1 SS}}{\textup{SST}}
+\textup{scorr2} = \frac{\textup{Type 2 SS}}{\textup{SST}}
+```
+When there is an intercept in the model the `scorr1` and `scorr2` are considered `missing` for the intercept.
+
 
 #### Weighted regression
 This version is the initial implementation of a weighted regression using analytical weights.
@@ -263,6 +285,7 @@ regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame, req_plots; α::Flo
 regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame; α::Float64=0.05, req_stats=["default"], weights::Union{Nothing,String}=nothing,remove_missing=false, cov=[:none], contrasts=nothing)
 predict_in_sample(lr::linRegRes, df::DataFrames.DataFrame; α=0.05, req_stats=["none"], dropmissingvalues=true)
 predict_out_of_sample(lr::linRegRes, df::DataFrames.DataFrame; α=0.05, req_stats=["none"], dropmissingvalues=true)
+function kfold(f, df, k, r = 1, shuffle=true; kwargs...)
 ```
 
 ## Index

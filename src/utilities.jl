@@ -68,7 +68,8 @@ end
     Returns all statistics availble for the fitted model.
 """
 get_all_model_stats() = Set([:coefs, :sse, :mse, :sst, :rmse, :aic, :sigma, :t_statistic, :vif, :r2, :adjr2, :stderror, :t_values, :p_values, :ci,
-                            :diag_normality, :diag_ks, :diag_ad, :diag_jb, :diag_heteroskedasticity, :diag_white, :diag_bp, :press ])
+                            :diag_normality, :diag_ks, :diag_ad, :diag_jb, :diag_heteroskedasticity, :diag_white, :diag_bp, :press, 
+                            :t1ss, :t2ss, :pcorr1, :pcorr2 , :scorr1, :scorr2 ])
 
 get_needed_model_stats(req_stats::String) = return get_needed_model_stats([req_stats])
 get_needed_model_stats(req_stats::Symbol) = return get_needed_model_stats(Set([req_stats]))
@@ -84,7 +85,7 @@ get_needed_model_stats(req_stats::Set{Symbol}) = get_needed_model_stats(collect(
 """
 function get_needed_model_stats(req_stats::Vector{Symbol})
     needed = Set([:coefs, :sse, :mse])
-    default = Set([:coefs, :sse, :mse, :sst, :rmse, :sigma, :t_statistic, :r2, :adjr2, :stderror, :t_values, :p_values, :ci])
+    default = Set([:coefs, :sse, :mse, :sst, :rmse, :sigma, :t_statistic, :r2, :adjr2, :stderror, :t_values, :p_values, :ci, :scorr2, :t2ss])
     full = get_all_model_stats()
     unique!(req_stats)
 
@@ -95,6 +96,8 @@ function get_needed_model_stats(req_stats::Vector{Symbol})
     :default in req_stats && union!(needed, default)
 
     :sst in req_stats && push!(needed, :sst)
+    :t1ss in req_stats && push!(needed, :t1ss)
+    :t2ss in req_stats && push!(needed, :t2ss)
     :press in req_stats && push!(needed, :press)
     :rmse in req_stats && push!(needed, :rmse)
     :aic in req_stats && push!(needed, :aic)
@@ -115,6 +118,24 @@ function get_needed_model_stats(req_stats::Vector{Symbol})
     if :diag_heteroskedasticity in req_stats
         push!(needed, :diag_white)
         push!(needed, :diag_bp)
+    end
+    if :pcorr1 in req_stats
+        push!(needed, :t1ss)
+        push!(needed, :pcorr1)
+    end
+    if :pcorr2 in req_stats
+        push!(needed, :t2ss)
+        push!(needed, :pcorr2)
+    end
+    if :scorr1 in req_stats
+        push!(needed, :sst)
+        push!(needed, :t1ss)
+        push!(needed, :scorr1)
+    end
+    if :scorr2 in req_stats
+        push!(needed, :sst)
+        push!(needed, :t2ss)
+        push!(needed, :scorr2)
     end
     if :r2 in req_stats
         push!(needed, :sst)

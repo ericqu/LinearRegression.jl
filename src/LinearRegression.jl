@@ -54,7 +54,13 @@ struct linRegRes
     hac_ci_low::Union{Nothing,Vector}       # Store the upper values confidence interval of the coefficients for Newey-West covariance estimators
     observations                            # Store the number of observations used in the model
     t_statistic::Union{Nothing,Float64}     # Store the t statistic
-    VIF::Union{Nothing,Vector}              # Store the Varince inflation factor
+    VIF::Union{Nothing,Vector}              # Store the Variance inflation factor
+    Type1SS::Union{Nothing,Vector}          # Store the Type 1 Sum of Squares
+    Type2SS::Union{Nothing,Vector}          # Store the Type 2 Sum of Squares
+    pcorr1::Union{Nothing,Vector{Union{Missing, Float64}}}           # Store the squared partial correlation coefficients using Type1SS
+    pcorr2::Union{Nothing,Vector{Union{Missing, Float64}}}           # Store the squared partial correlation coefficients using Type2SS
+    scorr1::Union{Nothing,Vector{Union{Missing, Float64}}}           # Store the squared semi-partial correlation coefficient using Type1SS
+    scorr2::Union{Nothing,Vector{Union{Missing, Float64}}}           # Store the squared semi-partial correlation coefficient using Type2SS
     modelformula                            # Store the model formula
     dataschema                              # Store the dataschema
     updformula                              # Store the updated model formula (after the dataschema has been applied)
@@ -96,7 +102,7 @@ function Base.show(io::IO, lr::linRegRes)
     if !isnothing(lr.PRESS)
         @printf(io, "  PRESS: %g\n", lr.PRESS)
     end
-    
+
     if length(lr.white_types) + length(lr.hac_types) == 0
         if !isnothing(lr.σ̂²) && !isnothing(lr.AIC)
             @printf(io, "  σ̂²: %g\t\t\tAIC: %g\n", lr.σ̂², lr.AIC)
@@ -111,18 +117,25 @@ function Base.show(io::IO, lr::linRegRes)
         @printf(io, "Confidence interval: %g%%\n", (1 - lr.alpha) * 100 )
     end
 
+    vec_stats_title = ["Coefs", "Std err", "t", "Pr(>|t|)", "low ci", "high ci", "VIF", 
+            "Type1 SS", "Type2 SS", "PCorr1", "PCorr2", 
+            "SCorr1", "SCorr2"]
+
     if length(lr.white_types) + length(lr.hac_types) == 0
         helper_print_table(io, "Coefficients statistics:", 
-            [lr.coefs, lr.stderrors, lr.t_values, lr.p_values, lr.ci_low, lr.ci_up, lr.VIF],
-            ["Coefs", "Std err", "t", "Pr(>|t|)", "low ci", "high ci", "VIF"], 
+            [lr.coefs, lr.stderrors, lr.t_values, lr.p_values, lr.ci_low, lr.ci_up, lr.VIF, 
+                lr.Type1SS, lr.Type2SS, lr.pcorr1, lr.pcorr2, lr.scorr1, lr.scorr2],
+            vec_stats_title, 
             lr.updformula)
     end
 
     if length(lr.white_types) > 0
         for (cur_i, cur_type) in enumerate(lr.white_types)
             helper_print_table(io, "White's covariance estimator ($(Base.Unicode.uppercase(string(cur_type)))):", 
-                [lr.coefs, lr.white_stderrors[cur_i], lr.white_t_values[cur_i], lr.white_p_values[cur_i], lr.white_ci_low[cur_i], lr.white_ci_up[cur_i], lr.VIF ],
-                ["Coefs", "Std err", "t", "Pr(>|t|)", "low ci", "high ci", "VIF"], 
+                [lr.coefs, lr.white_stderrors[cur_i], lr.white_t_values[cur_i], lr.white_p_values[cur_i], 
+                    lr.white_ci_low[cur_i], lr.white_ci_up[cur_i], lr.VIF, lr.Type1SS, lr.Type2SS, 
+                    lr.pcorr1, lr.pcorr2, lr.scorr1, lr.scorr2],
+                vec_stats_title, 
                 lr.updformula)
         end
     end
@@ -130,8 +143,10 @@ function Base.show(io::IO, lr::linRegRes)
     if length(lr.hac_types) > 0
         for (cur_i, cur_type) in enumerate(lr.hac_types)
             helper_print_table(io, "Newey-West's covariance estimator:", 
-                [lr.coefs, lr.hac_stderrors[cur_i], lr.hac_t_values[cur_i], lr.hac_p_values[cur_i], lr.hac_ci_low[cur_i], lr.hac_ci_up[cur_i], lr.VIF],
-                ["Coefs", "Std err", "t", "Pr(>|t|)", "low ci", "high ci", "VIF"], 
+                [lr.coefs, lr.hac_stderrors[cur_i], lr.hac_t_values[cur_i], lr.hac_p_values[cur_i], 
+                    lr.hac_ci_low[cur_i], lr.hac_ci_up[cur_i], lr.VIF, lr.Type1SS, lr.Type2SS, 
+                    lr.pcorr1, lr.pcorr2, lr.scorr1, lr.scorr2],
+                vec_stats_title, 
                 lr.updformula)
         end
     end
@@ -241,6 +256,50 @@ function hasintercept(f::StatsModels.FormulaTerm)
 end
 
 """
+function get_pcorr(typess, sse, intercept)
+
+    (internal) Get squared partial correlation coefficient given a TYPE1SS or Type2SS.
+
+"""
+function get_pcorr(typess, sse, intercept)
+    pcorr = Vector{Union{Missing, Float64}}(undef, length(typess))
+    if intercept 
+        @inbounds pcorr[1] = missing
+        @inbounds for i in 2:length(typess)
+            pcorr[i] = typess[i] / (typess[i] + sse)
+        end
+    else    
+        @inbounds for i in 1:length(typess)
+            pcorr[i] = typess[i] / (typess[i] + sse)
+        end
+    end
+
+    return pcorr
+end
+
+"""
+function get_scorr(typess, sst, intercept)
+
+    (internal) Get squared semi-partial correlation coefficient given a TYPE1SS or Type2SS.
+
+"""
+function get_scorr(typess, sst, intercept)
+    scorr = Vector{Union{Missing, Float64}}(undef, length(typess))
+    if intercept 
+        @inbounds scorr[1] = missing
+        @inbounds for i in 2:length(typess)
+            scorr[i] = typess[i] / sst[i]
+        end
+    else    
+        @inbounds for i in 1:length(typess)
+            scorr[i] = typess[i] / sst[i]
+        end
+    end
+
+    return scorr
+end
+
+"""
     function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame, req_plots; α::Float64=0.05, req_stats=["default"],
     weights::Union{Nothing,String}=nothing, remove_missing=false, cov=[:none], contrasts=nothing, 
     plot_args=Dict("plot_width" => 400, "loess_bw" => 0.6, "residuals_with_density" => false))
@@ -323,15 +382,14 @@ function regress(f::StatsModels.FormulaTerm, df::DataFrames.AbstractDataFrame; �
     end
     isweighted = !isnothing(weights)
     
-    needed_stats = get_needed_model_stats(req_stats)
-
+    
     if isnothing(contrasts)
         dataschema = schema(f, copieddf)
     else
         dataschema = schema(f, copieddf, contrasts)
     end
     updatedformula = apply_schema(f, dataschema)
-
+    
     y, x = modelcols(updatedformula, copieddf)
     n, p = size(x)
     if isweighted
@@ -339,30 +397,34 @@ function regress(f::StatsModels.FormulaTerm, df::DataFrames.AbstractDataFrame; �
         y = y .* sqrt.(copieddf[!, weights])
     end
     xy = [x y]
-
+    
     xytxy = xy' * xy 
+    
+    needed_stats = get_needed_model_stats(req_stats)
+    # stats initialization
+        total_scalar_stats = Set([:sse, :mse, :sst, :r2, :adjr2, :rmse, :aic, :sigma, :t_statistic, :press ])
+        total_vector_stats = Set([:coefs, :stderror, :t_values, :p_values, :ci, :vif, :t1ss, :t2ss, :pcorr1, :pcorr2, :scorr1, :scorr2])
+        total_diag_stats = Set([:diag_ks, :diag_ad, :diag_jb, :diag_white, :diag_bp])
+    
+        scalar_stats = Dict{Symbol,Union{Nothing,Float64}}(intersect(total_scalar_stats, needed_stats) .=> nothing)
+        vector_stats = Dict{Symbol,Union{Nothing,Vector}}(intersect(total_vector_stats, needed_stats) .=> nothing)
+        diag_stats = Dict{Symbol,Union{Nothing,String}}(intersect(total_diag_stats, needed_stats) .=> nothing)
 
-    # mandatory stats
-    sse = try 
-        sweep_op_full!(xytxy)[end]
+    sse = nothing
+    try
+        if :t1ss in needed_stats
+            sse, vector_stats[:t1ss] = sweep_op_fullT1SS!(xytxy)
+        else
+            sse = sweep_op_full!(xytxy)
+        end
         catch ae 
             throw(ae)
         finally
             check_cardinality(copieddf, updatedformula)
-        end
+    end
     coefs = xytxy[1:p, end]
     mse = xytxy[p + 1, p + 1] / (n - p)
 
-# optional stats
-    total_scalar_stats = Set([:sse, :mse, :sst, :r2, :adjr2, :rmse, :aic, :sigma, :t_statistic, :vif])
-    total_vector_stats = Set([:coefs, :stderror, :t_values, :p_values, :ci])
-    total_diag_stats = Set([:diag_ks, :diag_ad, :diag_jb, :diag_white, :diag_bp])
-
-    scalar_stats = Dict{Symbol,Union{Nothing,Float64}}(intersect(total_scalar_stats, needed_stats) .=> nothing)
-    vector_stats = Dict{Symbol,Union{Nothing,Vector}}(intersect(total_vector_stats, needed_stats) .=> nothing)
-    diag_stats = Dict{Symbol,Union{Nothing,String}}(intersect(total_diag_stats, needed_stats) .=> nothing)
-
-# optional stats
     if :sst in needed_stats
         if isweighted
             scalar_stats[:sst] = getSST(y, intercept, copieddf[!, weights])
@@ -387,6 +449,21 @@ function regress(f::StatsModels.FormulaTerm, df::DataFrames.AbstractDataFrame; �
     end
     if :t_statistic in needed_stats
         scalar_stats[:t_statistic] = quantile(TDist(n - p), 1 - α / 2)
+    end
+    if :t2ss in needed_stats
+        vector_stats[:t2ss] = get_TypeIISS(xytxy)
+    end
+    if :pcorr1 in needed_stats
+        vector_stats[:pcorr1] = get_pcorr(vector_stats[:t1ss], sse, intercept)
+    end
+    if :pcorr2 in needed_stats
+        vector_stats[:pcorr2] = get_pcorr(vector_stats[:t2ss], sse, intercept)
+    end
+    if :scorr1 in needed_stats
+        vector_stats[:scorr1] = get_scorr(vector_stats[:t1ss], scalar_stats[:sst], intercept)
+    end
+    if :scorr2 in needed_stats
+        vector_stats[:scorr2] = get_scorr(vector_stats[:t2ss], scalar_stats[:sst], intercept)
     end
     if :stderror in needed_stats
         vector_stats[:stderror] = real_sqrt.(diag(mse * @view(xytxy[1:end - 1, 1:end - 1])))
@@ -416,17 +493,17 @@ function regress(f::StatsModels.FormulaTerm, df::DataFrames.AbstractDataFrame; �
             diag_stats[:diag_jb] = present_jarque_bera_test(residuals, α)
         end 
         if :diag_white in needed_stats
-            if intercept
+            if intercept && !isweighted
                 diag_stats[:diag_white] = present_white_test(x, residuals, α)
             else
-                println("White test diagnostic for heteroscedasticity was requested but it requires a model with intercept")
+                println("White test diagnostic for heteroscedasticity was requested but it requires a non-weighted model with intercept")
             end
         end 
         if :diag_bp in needed_stats
-            if intercept
+            if intercept && !isweighted
                 diag_stats[:diag_bp] = present_breusch_pagan_test(x, residuals, α)
             else
-                println("Breusch-Pagan test diagnostic for heteroscedasticity was requested but it requires a model with intercept")
+                println("Breusch-Pagan test diagnostic for heteroscedasticity was requested but it requires a non weighted model with intercept")
             end
         end 
     end
@@ -537,7 +614,11 @@ end
         haskey(vector_stats, :ci) ? coefs .- vector_stats[:ci] : nothing, 
         white_ci_up, white_ci_low,
         hac_ci_up, hac_ci_low,
-        n, get(scalar_stats, :t_statistic, nothing), get(vector_stats, :vif, nothing), f, dataschema, updatedformula, α,
+        n, get(scalar_stats, :t_statistic, nothing), get(vector_stats, :vif, nothing), 
+        get(vector_stats, :t1ss, nothing), get(vector_stats, :t2ss, nothing), 
+        get(vector_stats, :pcorr1, nothing), get(vector_stats, :pcorr2, nothing), 
+        get(vector_stats, :scorr1, nothing), get(vector_stats, :scorr2, nothing), 
+        f, dataschema, updatedformula, α,
         get(diag_stats, :diag_ks, nothing), get(diag_stats, :diag_ad, nothing), get(diag_stats, :diag_jb, nothing),
         get(diag_stats, :diag_white, nothing),  get(diag_stats, :diag_bp, nothing),
         isweighted, weights, get(scalar_stats, :press, nothing)
