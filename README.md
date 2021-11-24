@@ -99,7 +99,6 @@ Please post your questions, feedabck or issues in the Issues tabs. As much as po
 - https://github.com/joshday/SweepOperator.jl
 - http://hua-zhou.github.io/teaching/biostatm280-2019spring/slides/12-sweep/sweep.html
 - https://github.com/mcreel/Econometrics for the Newey-West implementation
-- https://github.com/nalimilan/FreqTables.jl for Julia frequencies tables
 
 # Examples
 

@@ -300,7 +300,7 @@ function get_scorr(typess, sst, intercept)
 end
 
 """
-    function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame, req_plots; α::Float64=0.05, req_stats=["default"],
+    function regress(f::StatsModels.FormulaTerm, df::AbstractDataFrame, req_plots; α::Float64=0.05, req_stats=["default"],
     weights::Union{Nothing,String}=nothing, remove_missing=false, cov=[:none], contrasts=nothing, 
     plot_args=Dict("plot_width" => 400, "loess_bw" => 0.6, "residuals_with_density" => false))
 
@@ -342,7 +342,7 @@ function regress(f::StatsModels.FormulaTerm, df::AbstractDataFrame, req_plots; �
 end
         
 """
-    function regress(f::StatsModels.FormulaTerm, df::DataFrames.DataFrame; α::Float64=0.05, req_stats=["default"], weights::Union{Nothing,String}=nothing,
+    function regress(f::StatsModels.FormulaTerm, df::DataFrames.AbstractDataFrame; α::Float64=0.05, req_stats=["default"], weights::Union{Nothing,String}=nothing,
     remove_missing=false, cov=[:none], contrasts=nothing)
 
     Estimate the coefficients of the regression, given a dataset and a formula. 
@@ -687,7 +687,7 @@ function predict_internal(df::AbstractDataFrame, modelformula, updatedformula, w
     coefs, intercept, needed_white, needed_hac, σ̂², t_statistic, p, n, oos=false;
     α=0.05, req_stats=["none"], dropmissingvalues=true)
 
-    Internal, user should use `predict_in_sample` or `predict_out_of_sample`. This should be used only when the `struct linRegRes` is not constructed yet. 
+    Internal, users should use `predict_in_sample` or `predict_out_of_sample`. This should be used only when the `struct linRegRes` is not constructed yet. 
 """
 function predict_internal(df::AbstractDataFrame, modelformula, updatedformula, weighted, weights, extended_inverse,
             coefs, intercept, needed_white, needed_hac, σ̂², t_statistic, p, n, oos=false;
@@ -809,9 +809,8 @@ function predict_internal(df::AbstractDataFrame, modelformula, updatedformula, w
     return copieddf
 end
 
-
 """
-    predict_in_sample(lr::linRegRes, df::DataFrames.DataFrame; α=0.05, req_stats=["none"], dropmissingvalues=true)
+    function predict_in_sample(lr::linRegRes, df::AbstractDataFrame; α=0.05, req_stats=["none"], dropmissingvalues=true)
 
     Using the estimated coefficients from the regression make predictions, and calculate related statistics.
 """
@@ -821,9 +820,10 @@ function predict_in_sample(lr::linRegRes, df::AbstractDataFrame; α=0.05, req_st
         α=α, req_stats=req_stats, dropmissingvalues=dropmissingvalues)
 end
 
-""" predict out of sample
+"""
+    function predict_out_of_sample(lr::linRegRes, df::AbstractDataFrame; α=0.05, req_stats=["none"], dropmissingvalues=true)
 
-call predict with the out of sample (last argument) set to true
+    Similar to `predict_in_sample` although it does not expect a response variable nor produce statistics requiring a response variable.
 """
 function predict_out_of_sample(lr::linRegRes, df::AbstractDataFrame; α=0.05, req_stats=["none"], dropmissingvalues=true)
     predict_internal(df, lr.modelformula, lr.updformula, lr.weighted, lr.weights, lr.extended_inverse, lr.coefs, lr.intercept,
