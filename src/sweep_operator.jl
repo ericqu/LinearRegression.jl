@@ -107,7 +107,7 @@ function sweep_op_allT1SS!(A::AbstractMatrix{Float64})
 end
 
 """
-    get_TypeIISS(extended_inverse::AbstractMatrix{Float64})
+    function get_TypeIISS(extended_inverse::AbstractMatrix{Float64})
 
     (internal) Get Type II SS for all independent variables given an extended inverse (sweep operator already applied)
 """

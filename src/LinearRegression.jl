@@ -220,7 +220,7 @@ end
 
 
 """
-    lr_predict(xs, coefs, intercept::Bool)
+    function lr_predict(xs, coefs, intercept::Bool)
 
     (internal) Predict the ŷ given the x(s) and the coefficients of the linear regression.
 """
@@ -256,7 +256,7 @@ function hasintercept(f::StatsModels.FormulaTerm)
 end
 
 """
-function get_pcorr(typess, sse, intercept)
+    function get_pcorr(typess, sse, intercept)
 
     (internal) Get squared partial correlation coefficient given a TYPE1SS or Type2SS.
 
@@ -278,10 +278,9 @@ function get_pcorr(typess, sse, intercept)
 end
 
 """
-function get_scorr(typess, sst, intercept)
+    function get_scorr(typess, sst, intercept)
 
     (internal) Get squared semi-partial correlation coefficient given a TYPE1SS or Type2SS.
-
 """
 function get_scorr(typess, sst, intercept)
     scorr = Vector{Union{Missing, Float64}}(undef, length(typess))
@@ -677,7 +676,7 @@ end
 
 
 """
-function predict_internal(df::AbstractDataFrame, modelformula, updatedformula, weighted, weights, extended_inverse,
+    function predict_internal(df::AbstractDataFrame, modelformula, updatedformula, weighted, weights, extended_inverse,
     coefs, intercept, needed_white, needed_hac, σ̂², t_statistic, p, n, oos=false;
     α=0.05, req_stats=["none"], dropmissingvalues=true)
 
