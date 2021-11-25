@@ -85,7 +85,7 @@ end
     
     df = DataFrame(tw, [:y,:x,:w])
     f = @formula(y ~ x)
-    lm = regress(f, df, weights="w", req_stats=["default", "t1ss"])
+    lm = regress(f, df, weights="w", req_stats=["default", "t1ss", "t2ss"])
 
     @test isapprox([2.328237176867885, 0.08535712911515277], lm.coefs)
     @test isapprox(0.014954934572439349, lm.R2)

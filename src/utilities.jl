@@ -85,7 +85,7 @@ get_needed_model_stats(req_stats::Set{Symbol}) = get_needed_model_stats(collect(
 """
 function get_needed_model_stats(req_stats::Vector{Symbol})
     needed = Set([:coefs, :sse, :mse])
-    default = Set([:coefs, :sse, :mse, :sst, :rmse, :sigma, :t_statistic, :r2, :adjr2, :stderror, :t_values, :p_values, :ci, :scorr2, :t2ss])
+    default = Set([:coefs, :sse, :mse, :sst, :rmse, :sigma, :t_statistic, :r2, :adjr2, :stderror, :t_values, :p_values, :ci])
     full = get_all_model_stats()
     unique!(req_stats)
 
