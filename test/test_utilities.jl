@@ -76,19 +76,19 @@ end
 
 @testset "model stats massaging" begin
     wanted = ["default"]
-    needed = Set([:coefs, :sse, :mse, :sst, :rmse, :sigma, :t_statistic, :r2, :adjr2, :stderror, :t_values, :p_values, :ci, :scorr2, :t2ss])
+    needed = Set([:coefs, :sse, :mse, :sst, :rmse, :sigma, :t_statistic, :r2, :adjr2, :stderror, :t_values, :p_values, :ci])
     @test needed == get_needed_model_stats(wanted)
     wanted = [:default, :vif]
-    needed = Set([:coefs, :sse, :vif, :mse, :sst, :rmse, :sigma, :t_statistic, :r2, :adjr2, :stderror, :t_values, :p_values, :ci, :scorr2, :t2ss])
+    needed = Set([:coefs, :sse, :vif, :mse, :sst, :rmse, :sigma, :t_statistic, :r2, :adjr2, :stderror, :t_values, :p_values, :ci])
     @test needed == get_needed_model_stats(wanted)
     wanted = [:default, :diag_ks]
-    needed = Set([:coefs, :sse, :diag_ks, :mse, :sst, :rmse, :sigma, :t_statistic, :r2, :adjr2, :stderror, :t_values, :p_values, :ci, :scorr2, :t2ss])
+    needed = Set([:coefs, :sse, :diag_ks, :mse, :sst, :rmse, :sigma, :t_statistic, :r2, :adjr2, :stderror, :t_values, :p_values, :ci])
     @test needed == get_needed_model_stats(wanted)
     wanted = [:default, :diag_normality]
-    needed = Set([:coefs, :sse, :diag_ks, :diag_ad, :diag_jb, :mse, :sst, :rmse, :sigma, :t_statistic, :r2, :adjr2, :stderror, :t_values, :p_values, :ci, :scorr2, :t2ss])
+    needed = Set([:coefs, :sse, :diag_ks, :diag_ad, :diag_jb, :mse, :sst, :rmse, :sigma, :t_statistic, :r2, :adjr2, :stderror, :t_values, :p_values, :ci])
     @test needed == get_needed_model_stats(wanted)
     wanted = [:default, :diag_heteroskedasticity]
-    needed = Set([:coefs, :sse, :diag_white, :diag_bp, :mse, :sst, :rmse, :sigma, :t_statistic, :r2, :adjr2, :stderror, :t_values, :p_values, :ci, :scorr2, :t2ss])
+    needed = Set([:coefs, :sse, :diag_white, :diag_bp, :mse, :sst, :rmse, :sigma, :t_statistic, :r2, :adjr2, :stderror, :t_values, :p_values, :ci])
     @test needed == get_needed_model_stats(wanted)
     wanted = ["r2", "rmse"]
     needed = Set([:r2, :rmse, :coefs, :sse, :mse, :sst])

@@ -300,9 +300,7 @@ function get_scorr(typess, sst, intercept)
 end
 
 """
-    function regress(f::StatsModels.FormulaTerm, df::AbstractDataFrame, req_plots; α::Float64=0.05, req_stats=["default"],
-    weights::Union{Nothing,String}=nothing, remove_missing=false, cov=[:none], contrasts=nothing, 
-    plot_args=Dict("plot_width" => 400, "loess_bw" => 0.6, "residuals_with_density" => false))
+function regress(f::StatsModels.FormulaTerm, df::AbstractDataFrame, req_plots; α::Float64=0.05, req_stats=["default"], weights::Union{Nothing,String}=nothing, remove_missing=false, cov=[:none], contrasts=nothing, plot_args=Dict("plot_width" => 400, "loess_bw" => 0.6, "residuals_with_density" => false))
 
     Estimate the coefficients of the regression, given a dataset and a formula. and provide the requested plot(s).
     A dictionary of the generated plots indexed by the descritption of the plots.
@@ -310,9 +308,7 @@ end
     It is possible to indicate the width of the plots, and the bandwidth of the Loess smoother.
 
 """
-function regress(f::StatsModels.FormulaTerm, df::AbstractDataFrame, req_plots; α::Float64=0.05, req_stats=["default"],
-                weights::Union{Nothing,String}=nothing, remove_missing=false, cov=[:none], contrasts=nothing, 
-                plot_args=Dict("plot_width" => 400, "loess_bw" => 0.6, "residuals_with_density" => false))
+function regress(f::StatsModels.FormulaTerm, df::AbstractDataFrame, req_plots; α::Float64=0.05, req_stats=["default"], weights::Union{Nothing,String}=nothing, remove_missing=false, cov=[:none], contrasts=nothing, plot_args=Dict("plot_width" => 400, "loess_bw" => 0.6, "residuals_with_density" => false))
 
     all_plots = Dict{String,VegaLite.VLSpec}()
     neededplots = get_needed_plots(req_plots)
@@ -693,7 +689,12 @@ function predict_internal(df::AbstractDataFrame, modelformula, updatedformula, w
             coefs, intercept, needed_white, needed_hac, σ̂², t_statistic, p, n, oos=false;
             α=0.05, req_stats=["none"], dropmissingvalues=true)
 
-    copieddf = df[: , Symbol.(keys(schema(modelformula, df).schema))]
+    copieddf = df
+    if oos
+        copieddf = df[: , Symbol.(keys(schema(modelformula.rhs, df).schema))]
+    else
+        copieddf = df[: , Symbol.(keys(schema(modelformula, df).schema))]
+    end
     if dropmissingvalues == true
         dropmissing!(copieddf)
     end
