@@ -348,7 +348,6 @@ end
     Some robust covariance estimator(s) can be requested through the `cov` argument.
     Default contrast is dummy coding, other contrasts can be requested through the `contrasts` argument.
     For a weighted regression, the name of column containing the analytical weights shall be identified by the `weights` argument.
-
 """
 function regress(f::StatsModels.FormulaTerm, df::DataFrames.AbstractDataFrame; α::Float64=0.05, req_stats=["default"], weights::Union{Nothing,String}=nothing,
                 remove_missing=false, cov=[:none], contrasts=nothing)
