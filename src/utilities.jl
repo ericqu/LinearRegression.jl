@@ -27,7 +27,7 @@ function get_needed_plots(p::Vector{Symbol})
 end
 
 """  
-    get_robust_cov_stats()
+    function get_robust_cov_stats()
 
     Return all robust covariance estimators.
 """
@@ -63,7 +63,7 @@ function get_needed_robust_cov_stats(s::Vector{Symbol})
 end
 
 """
-    get_all_model_stats()
+    function get_all_model_stats()
 
     Returns all statistics availble for the fitted model.
 """
@@ -79,7 +79,7 @@ get_needed_model_stats(::Set{Any}) = return get_needed_model_stats(Set([:none]))
 get_needed_model_stats(req_stats::Set{Symbol}) = get_needed_model_stats(collect(req_stats))
 
 """
-    get_needed_model_stats(req_stats::Vector{Symbol})
+    function get_needed_model_stats(req_stats::Vector{Symbol})
 
     return the list of needed statistics given the list of statistics about the model the caller wants.
 """
@@ -172,7 +172,7 @@ function get_needed_model_stats(req_stats::Vector{Symbol})
 end
 
 """
-    get_all_prediction_stats()
+    function get_all_prediction_stats()
 
     get all the available statistics about the values predicted by a fitted model
 """
@@ -408,12 +408,6 @@ function present_jarque_bera_test(residuals, α)
         topresent *= "  with $(alpha_value)% confidence: reject null hyposthesis.\n"
     end
 end
-
-# function warn_sigma(lm, stat)
-#     if length(lm.white_types) + length(lm.hac_types) > 0
-#         println(io, "The $(stat) statistic that relies on Sigma^2 has been requested. At least one robust covariance have been requested indicating that the assumptions needed for Sigma^2 may not be present.")
-#     end
-# end
 
 function warn_sigma(lm, stat)
     warn_sigma(lm.white_types, lm.hac_types , stat)

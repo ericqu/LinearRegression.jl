@@ -281,7 +281,7 @@ uuid = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 
 [[LinearRegression]]
 deps = ["DataFrames", "Distributions", "FreqTables", "HypothesisTests", "LinearAlgebra", "NamedArrays", "Printf", "Random", "StatsBase", "StatsModels", "VegaLite"]
-git-tree-sha1 = "9e63d292b0b3400618709ef23ee6716729ef23bf"
+git-tree-sha1 = "72503b76d2dc309b86d1f9577c9c92347d7b61e9"
 repo-rev = "main"
 repo-url = "https://github.com/ericqu/LinearRegression.jl.git"
 uuid = "e91d531d-6e51-44a8-96b7-a10d5d51daa3"
