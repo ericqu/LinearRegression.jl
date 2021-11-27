@@ -246,5 +246,5 @@ Finally if you would like more examples I encourage you to go to the documentati
 
 ## Notable changes since version 0.72
 - Addition of cross-validation features: K-fold cross-validation and the PRESS statistic at the model level.
-- Addition of several model statistics: Type 1 and 2 SS, squared partial correlation coefficients based on Type 1 SS and Type 2 SS, squared semi-partial correlation coefficients based on Type 1 and 2 SS. The squared semi-partial correlation coefficient based on Type 2 SS is added to the default list of statistics at the model level.
+- Addition of several model statistics: Type 1 and 2 SS, squared partial correlation coefficients based on Type 1 SS and Type 2 SS, squared semi-partial correlation coefficients based on Type 1 and 2 SS.
 - additional diagnostic using the frequency tables to identify a set of categories with no observation.
