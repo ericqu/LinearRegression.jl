@@ -72,6 +72,9 @@ LinearRegression package provides access to some robust covariance estimators (f
 - The standard errors and their equivalent with a Heteroscedasticity or HAC covariance estimator
 - The t values and their equivalent with a Heteroscedasticity or HAC covariance estimator
 - P values for each predictor and their equivalent with a Heteroscedasticity or HAC covariance estimator
+- Type 1 & 2 Sum of squares
+- Squared partial correlation coefficient, squared semi-partial correlation coefficient. 
+- PRESS as the sum of square of predicted residuals errors
 
 ## List of Statistics about the predicted values:
 - The predicted values
@@ -87,7 +90,7 @@ LinearRegression package provides access to some robust covariance estimators (f
 - LCLP is the lower bound of the confidence interval for the expected (mean) value.
 - UCLP is the upper bound of the confidence interval for the expected (mean) value.
 - Cook's Distance
-- PRESS as the sum of squares of predicted residual errors
+- PRESS as predicted residual errors
 
 # Questions and Feedback
 Please post your questions, feedabck or issues in the Issues tabs. As much as possible, please provide relevant contextual information.
