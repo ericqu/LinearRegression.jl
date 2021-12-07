@@ -432,7 +432,7 @@ function regress(f::StatsModels.FormulaTerm, df::DataFrames.AbstractDataFrame; Î
         scalar_stats[:adjr2] = 1. - ((n - convert(Int64, intercept)) * (1. - scalar_stats[:r2])) / (n - p)
     end
     if :rmse in needed_stats
-        scalar_stats[:rmse] = âˆšmse
+        scalar_stats[:rmse] = real_sqrt(mse)
     end
     if :aic in needed_stats
         scalar_stats[:aic] =  n * log(sse / n) + 2p
