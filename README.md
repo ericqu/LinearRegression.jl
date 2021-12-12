@@ -1,3 +1,8 @@
+# Change of name
+**The package has been renamed LinearRegressionKit.jl** because the name LinearRegression.jl was already registered.
+The package LinearRegression.jl won't be updated anymore, and **you should use LinearRegressionKit.jl from now on.**
+If there is any question please ask them on [LinearRegressionKit.jl](https://github.com/ericqu/LinearRegressionKit.jl)
+
 [![](https://img.shields.io/badge/docs-dev-blue.svg)](https://ericqu.github.io/LinearRegression.jl/dev/)
 [![](https://img.shields.io/badge/docs-stable-blue.svg)](https://ericqu.github.io/LinearRegression.jl/stable)
 # LinearRegression.jl
